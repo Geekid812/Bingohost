@@ -9,7 +9,7 @@ use tracing::{error, info};
 
 use crate::config;
 use crate::util::{
-    auth::{Authenticator, ValidationError},
+    auth::{Authenticator, PlayerIdentity, ValidationError},
     version::Version,
 };
 
@@ -91,14 +91,32 @@ impl Protocol {
         };
 
         info!("Authentificated client: {:?}", identity);
-        self.handshake_end(HandshakeCode::Ok).await;
+        self.handshake_success(identity).await;
         self.state = ConnectionState::Connected;
     }
 
     async fn handshake_end(&mut self, code: HandshakeCode) {
-        self.send(to_string(&HandshakeResponse { code }).expect("json conversion to pass"))
-            .await
-            .unwrap_or_default();
+        self.send(
+            to_string(&HandshakeResponse {
+                code,
+                username: None,
+            })
+            .expect("json conversion to pass"),
+        )
+        .await
+        .unwrap_or_default();
+    }
+
+    async fn handshake_success(&mut self, identity: PlayerIdentity) {
+        self.send(
+            to_string(&HandshakeResponse {
+                code: HandshakeCode::Ok,
+                username: Some(identity.display_name),
+            })
+            .expect("json conversion to pass"),
+        )
+        .await
+        .unwrap_or_default();
     }
 
     async fn recv(&mut self) -> Result<String> {
@@ -130,6 +148,8 @@ struct HandshakeRequest {
 #[derive(Serialize)]
 struct HandshakeResponse {
     code: HandshakeCode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    username: Option<String>,
 }
 
 #[derive(Serialize_repr)]
