@@ -5,7 +5,7 @@ use std::io::{Error, ErrorKind, Result};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::config;
 use crate::util::{
@@ -28,22 +28,14 @@ impl Protocol {
         }
     }
 
-    pub async fn run_loop(&mut self) {
-        self.handshake().await;
-
-        if self.state != ConnectionState::Connected {
-            return;
+    pub async fn handshake(&mut self) -> Option<PlayerIdentity> {
+        if self.state != ConnectionState::Closed {
+            warn!(
+                "Handshake was requested when the connection was not closed: {:?}",
+                self.state
+            );
+            return None;
         }
-        loop {
-            if self.recv().await.is_ok() {
-                println!("received a message in runloop");
-            } else {
-                return;
-            }
-        }
-    }
-
-    async fn handshake(&mut self) {
         self.state = ConnectionState::Connnecting;
 
         // Receive opening handshake
@@ -51,28 +43,28 @@ impl Protocol {
             Ok(msg) => msg,
             Err(e) => {
                 println!("{:#?}", e);
-                return;
+                return None;
             }
         };
         let req: HandshakeRequest = match from_str(&handshake) {
             Ok(req) => req,
             Err(_) => {
                 self.handshake_end(HandshakeCode::ParseError).await;
-                return;
+                return None;
             }
         };
         let client_version: Version = match Version::try_from(req.version) {
             Ok(ver) => ver,
             Err(_) => {
                 self.handshake_end(HandshakeCode::ParseError).await;
-                return;
+                return None;
             }
         };
 
         // Client version check
         if client_version < config::MINIMUM_CLIENT_VERSION {
             self.handshake_end(HandshakeCode::IncompatibleVersion).await;
-            return;
+            return None;
         }
 
         // Authentification
@@ -86,18 +78,19 @@ impl Protocol {
                     ValidationError::BackendError(_) => HandshakeCode::AuthRefused,
                 };
                 self.handshake_end(code).await;
-                return;
+                return None;
             }
         };
 
         info!("Authentificated client: {:?}", identity);
-        self.handshake_success(identity).await;
+        self.handshake_success(&identity).await;
         self.state = ConnectionState::Connected;
+        return Some(identity);
     }
 
     async fn handshake_end(&mut self, code: HandshakeCode) {
         self.send(
-            to_string(&HandshakeResponse {
+            &to_string(&HandshakeResponse {
                 code,
                 username: None,
             })
@@ -107,11 +100,11 @@ impl Protocol {
         .unwrap_or_default();
     }
 
-    async fn handshake_success(&mut self, identity: PlayerIdentity) {
+    async fn handshake_success(&mut self, identity: &PlayerIdentity) {
         self.send(
-            to_string(&HandshakeResponse {
+            &to_string(&HandshakeResponse {
                 code: HandshakeCode::Ok,
-                username: Some(identity.display_name),
+                username: Some(identity.display_name.clone()),
             })
             .expect("json conversion to pass"),
         )
@@ -119,7 +112,7 @@ impl Protocol {
         .unwrap_or_default();
     }
 
-    async fn recv(&mut self) -> Result<String> {
+    pub async fn recv(&mut self) -> Result<String> {
         let mut buf = [0; 4];
         self.socket.read_exact(&mut buf).await?;
         let size = i32::from_le_bytes(buf);
@@ -130,12 +123,16 @@ impl Protocol {
         Ok(message)
     }
 
-    async fn send(&mut self, message: String) -> Result<()> {
+    pub async fn send(&mut self, message: &str) -> Result<()> {
         let f = (message.len() as i32).to_le_bytes();
         let msg_buf = message.as_bytes();
         self.socket.write_all(&f).await?;
         self.socket.write_all(&msg_buf).await?;
         Ok(())
+    }
+
+    pub fn state(&self) -> &ConnectionState {
+        &self.state
     }
 }
 
@@ -162,8 +159,8 @@ enum HandshakeCode {
     AuthRefused = 4,
 }
 
-#[derive(PartialEq, Eq)]
-enum ConnectionState {
+#[derive(PartialEq, Eq, Debug)]
+pub enum ConnectionState {
     Closed,
     Connnecting,
     Connected,

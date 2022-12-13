@@ -3,8 +3,12 @@ use tokio::net::TcpSocket;
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
 
+pub mod channel;
 pub mod config;
-mod protocol;
+pub mod gameroom;
+pub mod gameteam;
+pub mod player;
+pub mod protocol;
 pub mod util;
 
 #[tokio::main]
@@ -49,7 +53,12 @@ async fn main() {
         let auth = auth_arc.clone();
         tokio::spawn(async move {
             let mut protocol = protocol::Protocol::new(socket, auth);
-            protocol.run_loop().await;
+            let identity = match protocol.handshake().await {
+                Some(i) => i,
+                None => return,
+            };
+            let player = player::PlayerControl::new(protocol, identity);
+            player.run().await;
         });
     }
 }
