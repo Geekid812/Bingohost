@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
 use serde_repr::Serialize_repr;
-use std::io::{Error, ErrorKind, Result};
+use std::error::Error;
+use std::io;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -112,23 +113,28 @@ impl Protocol {
         .unwrap_or_default();
     }
 
-    pub async fn recv(&mut self) -> Result<String> {
+    pub async fn recv(&mut self) -> io::Result<String> {
         let mut buf = [0; 4];
         self.socket.read_exact(&mut buf).await?;
         let size = i32::from_le_bytes(buf);
         let mut msg_buf = vec![0; size as usize];
         self.socket.read_exact(&mut msg_buf).await?;
-        let message =
-            String::from_utf8(msg_buf).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+        let message = String::from_utf8(msg_buf)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         Ok(message)
     }
 
-    pub async fn send(&mut self, message: &str) -> Result<()> {
+    pub async fn send(&mut self, message: &str) -> io::Result<()> {
         let f = (message.len() as i32).to_le_bytes();
         let msg_buf = message.as_bytes();
         self.socket.write_all(&f).await?;
         self.socket.write_all(&msg_buf).await?;
         Ok(())
+    }
+
+    pub async fn error(&mut self, err: &str) {
+        // TODO: stub
+        error!(err);
     }
 
     pub fn state(&self) -> &ConnectionState {

@@ -1,4 +1,5 @@
 use rand::{distributions::Uniform, prelude::Distribution};
+use serde_repr::Deserialize_repr;
 
 use crate::{
     channel::Channel,
@@ -6,14 +7,14 @@ use crate::{
     util::auth::PlayerIdentity,
 };
 
-pub struct Room {
+pub struct GameRoom {
     config: RoomConfiguration,
     join_code: String,
     channel: Channel,
     members: Vec<PlayerData>,
 }
 
-impl Room {
+impl GameRoom {
     pub fn create(config: RoomConfiguration) -> Self {
         let mut rng = rand::thread_rng();
         let uniform = Uniform::from(0..JOINCODE_CHARS.len());
@@ -28,6 +29,10 @@ impl Room {
             members: Vec::new(),
         }
     }
+
+    pub fn join_code(&self) -> &str {
+        return &self.join_code;
+    }
 }
 
 struct PlayerData {
@@ -35,3 +40,21 @@ struct PlayerData {
 }
 
 pub struct RoomConfiguration {}
+
+#[derive(Deserialize_repr)]
+#[repr(i32)]
+pub enum MapMode {
+    TOTD,
+    RandomTMX,
+    Mappack,
+}
+
+#[derive(Deserialize_repr)]
+#[repr(i32)]
+pub enum Medal {
+    Author,
+    Gold,
+    Silver,
+    Bronze,
+    None,
+}

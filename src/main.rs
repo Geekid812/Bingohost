@@ -4,11 +4,12 @@ use tracing::info;
 use tracing_subscriber::FmtSubscriber;
 
 pub mod channel;
+pub mod client;
 pub mod config;
 pub mod gameroom;
 pub mod gameteam;
-pub mod player;
 pub mod protocol;
+pub mod requests;
 pub mod util;
 
 #[tokio::main]
@@ -57,7 +58,7 @@ async fn main() {
                 Some(i) => i,
                 None => return,
             };
-            let player = player::PlayerControl::new(protocol, identity);
+            let player = client::GameClient::new(protocol, identity);
             player.run().await;
         });
     }
