@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use crate::config::TEAMS;
 use crate::gameroom::{GameRoom, RoomConfiguration};
 use crate::protocol::Protocol;
 use crate::requests::{BaseRequest, BaseResponse, CreateRoomResponse, RequestVariant, Response};
@@ -56,14 +57,12 @@ impl GameClient {
     pub async fn handle(&mut self, msg: &RequestVariant) -> impl Response {
         match msg {
             RequestVariant::CreateRoom(req) => {
-                let room_code = self
-                    .server
-                    .lock()
-                    .expect("lock poisoned")
-                    .create_new_room(req.config.clone());
+                let mut lock = self.server.lock().expect("lock poisoned");
+                let (join_code, teams) = lock.create_new_room(req.config.clone());
                 CreateRoomResponse {
-                    room_code,
-                    max_teams: 10,
+                    join_code,
+                    teams,
+                    max_teams: TEAMS.len(),
                 }
             }
         }

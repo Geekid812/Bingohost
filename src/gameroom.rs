@@ -13,8 +13,8 @@ pub struct GameRoom<'a> {
     config: RoomConfiguration,
     join_code: String,
     channel: Channel,
-    members: Vec<PlayerData<'a>>,
-    teams: Vec<GameTeam<'a>>,
+    pub members: Vec<PlayerData<'a>>,
+    pub teams: Vec<GameTeam<'a>>,
 }
 
 impl<'a> GameRoom<'a> {
@@ -36,6 +36,10 @@ impl<'a> GameRoom<'a> {
 
     pub fn join_code(&self) -> &str {
         return &self.join_code;
+    }
+
+    pub fn config(&self) -> &RoomConfiguration {
+        return &self.config;
     }
 
     pub fn create_team(&mut self) {

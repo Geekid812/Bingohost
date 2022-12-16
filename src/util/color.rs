@@ -1,7 +1,8 @@
+use serde::Serialize;
 use std::num::ParseIntError;
 use thiserror::Error;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub struct RgbColor(pub u8, pub u8, pub u8);
 
 impl RgbColor {

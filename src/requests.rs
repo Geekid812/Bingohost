@@ -1,7 +1,9 @@
-#![allow(unused)]
 use serde::{Deserialize, Serialize};
 
-use crate::gameroom::{MapMode, Medal, RoomConfiguration};
+use crate::{
+    gameroom::{MapMode, Medal, RoomConfiguration},
+    gameteam::{GameTeam, NetworkTeam},
+};
 
 #[macro_use]
 mod macros {
@@ -61,9 +63,9 @@ pub struct CreateRoomRequest {
 
 #[derive(Serialize)]
 pub struct CreateRoomResponse {
-    pub room_code: String,
-    pub max_teams: u32,
-    // TODO add teams array
+    pub join_code: String,
+    pub max_teams: usize,
+    pub teams: Vec<NetworkTeam>,
 }
 
 impl_request!(CreateRoomRequest, CreateRoomResponse);
