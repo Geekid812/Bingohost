@@ -1,16 +1,28 @@
+use std::sync::{Arc, Mutex};
+
 use crate::gameroom::{GameRoom, RoomConfiguration};
 use crate::protocol::Protocol;
 use crate::requests::{BaseRequest, BaseResponse, CreateRoomResponse, RequestVariant, Response};
+use crate::server::GameServer;
 use crate::util::auth::PlayerIdentity;
 
 pub struct GameClient {
+    server: Arc<Mutex<GameServer>>,
     protocol: Protocol,
     identity: PlayerIdentity,
 }
 
 impl GameClient {
-    pub fn new(protocol: Protocol, identity: PlayerIdentity) -> Self {
-        Self { protocol, identity }
+    pub fn new(
+        server: Arc<Mutex<GameServer>>,
+        protocol: Protocol,
+        identity: PlayerIdentity,
+    ) -> Self {
+        Self {
+            server,
+            protocol,
+            identity,
+        }
     }
 
     pub async fn run(mut self) {
@@ -26,10 +38,14 @@ impl GameClient {
                 };
                 let res = self.handle(&request.variant).await;
                 let response = request.reply(res);
-                self.protocol
+                let sent = self
+                    .protocol
                     .send(&serde_json::to_string(&response).expect("response serialization"))
-                    .await
-                    .unwrap(); // TODO
+                    .await;
+                if let Err(e) = sent {
+                    self.protocol.error(&e.to_string()).await;
+                    return;
+                }
             } else if let Err(e) = data {
                 self.protocol.error(&e.to_string()).await;
                 return;
@@ -38,10 +54,18 @@ impl GameClient {
     }
 
     pub async fn handle(&mut self, msg: &RequestVariant) -> impl Response {
-        let room = GameRoom::create(RoomConfiguration {});
-        CreateRoomResponse {
-            room_code: room.join_code().to_owned(),
-            max_teams: 10,
+        match msg {
+            RequestVariant::CreateRoom(req) => {
+                let room_code = self
+                    .server
+                    .lock()
+                    .expect("lock poisoned")
+                    .create_new_room(req.config.clone());
+                CreateRoomResponse {
+                    room_code,
+                    max_teams: 10,
+                }
+            }
         }
     }
 }

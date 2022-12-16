@@ -1,4 +1,7 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+};
 use tokio::net::TcpSocket;
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
@@ -10,6 +13,7 @@ pub mod gameroom;
 pub mod gameteam;
 pub mod protocol;
 pub mod requests;
+pub mod server;
 pub mod util;
 
 #[tokio::main]
@@ -30,6 +34,8 @@ async fn main() {
             .expect("authentification route to be valid"),
     );
     let auth_arc = Arc::new(authenticator);
+
+    let server_arc = Arc::new(Mutex::new(server::GameServer::new()));
 
     let socket = TcpSocket::new_v4().expect("ipv4 socket to be created");
     socket
@@ -52,13 +58,14 @@ async fn main() {
 
         info!("accepted a connection");
         let auth = auth_arc.clone();
+        let server = server_arc.clone();
         tokio::spawn(async move {
             let mut protocol = protocol::Protocol::new(socket, auth);
             let identity = match protocol.handshake().await {
                 Some(i) => i,
                 None => return,
             };
-            let player = client::GameClient::new(protocol, identity);
+            let player = client::GameClient::new(server, protocol, identity);
             player.run().await;
         });
     }

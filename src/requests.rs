@@ -1,7 +1,7 @@
 #![allow(unused)]
 use serde::{Deserialize, Serialize};
 
-use crate::gameroom::{MapMode, Medal};
+use crate::gameroom::{MapMode, Medal, RoomConfiguration};
 
 #[macro_use]
 mod macros {
@@ -55,17 +55,15 @@ pub enum RequestVariant {
 
 #[derive(Deserialize)]
 pub struct CreateRoomRequest {
-    pub size: u32,
-    pub selection: MapMode,
-    pub medal: Medal,
-    pub timelimit: u32,
-    pub mappack_id: Option<String>,
+    #[serde(flatten)]
+    pub config: RoomConfiguration,
 }
 
 #[derive(Serialize)]
 pub struct CreateRoomResponse {
     pub room_code: String,
     pub max_teams: u32,
+    // TODO add teams array
 }
 
 impl_request!(CreateRoomRequest, CreateRoomResponse);
