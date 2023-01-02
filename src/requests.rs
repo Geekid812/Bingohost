@@ -1,9 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    gameroom::{MapMode, Medal, RoomConfiguration},
-    gameteam::{GameTeam, NetworkTeam},
-};
+use crate::{gameroom::RoomConfiguration, gameteam::NetworkTeam};
 
 #[macro_use]
 mod macros {
@@ -33,7 +30,7 @@ pub struct BaseRequest {
 }
 
 impl BaseRequest {
-    pub fn reply<R: Response>(&self, response: R) -> BaseResponse<R> {
+    pub fn reply(&self, response: ResponseVariant) -> BaseResponse {
         BaseResponse {
             sequence: self.sequence,
             data: response,
@@ -42,17 +39,25 @@ impl BaseRequest {
 }
 
 #[derive(Serialize)]
-pub struct BaseResponse<R: Response> {
+pub struct BaseResponse {
     #[serde(rename = "seq")]
     sequence: u32,
     #[serde(flatten)]
-    data: R,
+    data: ResponseVariant,
 }
 
 #[derive(Deserialize)]
 #[serde(untagged)]
 pub enum RequestVariant {
     CreateRoom(CreateRoomRequest),
+    ChangeTeam(ChangeTeamRequest),
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+pub enum ResponseVariant {
+    CreateRoom(CreateRoomResponse),
+    ChangeTeam(ChangeTeamResponse),
 }
 
 #[derive(Deserialize)]
@@ -69,3 +74,13 @@ pub struct CreateRoomResponse {
 }
 
 impl_request!(CreateRoomRequest, CreateRoomResponse);
+
+#[derive(Deserialize)]
+pub struct ChangeTeamRequest {
+    pub team: usize,
+}
+
+#[derive(Serialize)]
+pub struct ChangeTeamResponse {}
+
+impl_request!(ChangeTeamRequest, ChangeTeamResponse);

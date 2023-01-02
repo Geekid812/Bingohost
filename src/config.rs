@@ -8,7 +8,7 @@ pub const TCP_LISTENING_PORT: u16 = 6600;
 pub const MINIMUM_CLIENT_VERSION: Version = Version(3, 0);
 pub const AUTHENTICATION_API_SECRET: &'static str = env!("AUTH_SECRET");
 
-pub const MAP_QUEUE_SIZE: usize = 50;
+pub const MAP_QUEUE_SIZE: usize = 0;
 pub const TMX_FETCH_TIMEOUT: Duration = Duration::from_secs(20);
 pub const TMX_USERAGENT: &'static str = env!("TMX_USERAGENT");
 

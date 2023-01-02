@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use crate::config::TEAMS;
 use crate::protocol::Protocol;
-use crate::requests::{BaseRequest, CreateRoomResponse, RequestVariant, Response};
+use crate::requests::{
+    BaseRequest, BaseResponse, ChangeTeamResponse, CreateRoomRequest, CreateRoomResponse,
+    RequestVariant, Response, ResponseVariant,
+};
 use crate::rest::auth::PlayerIdentity;
 use crate::GlobalServer;
 
@@ -49,16 +52,17 @@ impl GameClient {
         }
     }
 
-    pub async fn handle(&mut self, msg: &RequestVariant) -> impl Response {
-        match msg {
+    async fn handle(&mut self, variant: &RequestVariant) -> ResponseVariant {
+        match variant {
             RequestVariant::CreateRoom(req) => {
                 let (join_code, teams) = self.server.create_new_room(req.config.clone(), &self);
-                CreateRoomResponse {
+                ResponseVariant::CreateRoom(CreateRoomResponse {
                     join_code,
                     teams,
                     max_teams: TEAMS.len(),
-                }
+                })
             }
+            RequestVariant::ChangeTeam(_req) => ResponseVariant::ChangeTeam(ChangeTeamResponse {}), // TODO
         }
     }
 
