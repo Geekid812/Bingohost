@@ -1,13 +1,14 @@
+use std::sync::Arc;
+
 use crate::config::TEAMS;
-use crate::gameroom::{GameRoom, RoomConfiguration};
 use crate::protocol::Protocol;
-use crate::requests::{BaseRequest, BaseResponse, CreateRoomResponse, RequestVariant, Response};
+use crate::requests::{BaseRequest, CreateRoomResponse, RequestVariant, Response};
 use crate::rest::auth::PlayerIdentity;
 use crate::GlobalServer;
 
 pub struct GameClient {
     server: GlobalServer,
-    protocol: Protocol,
+    protocol: Arc<Protocol>,
     identity: PlayerIdentity,
 }
 
@@ -15,7 +16,7 @@ impl GameClient {
     pub fn new(server: GlobalServer, protocol: Protocol, identity: PlayerIdentity) -> Self {
         Self {
             server,
-            protocol,
+            protocol: Arc::new(protocol),
             identity,
         }
     }
@@ -51,7 +52,7 @@ impl GameClient {
     pub async fn handle(&mut self, msg: &RequestVariant) -> impl Response {
         match msg {
             RequestVariant::CreateRoom(req) => {
-                let (join_code, teams) = self.server.create_new_room(req.config.clone());
+                let (join_code, teams) = self.server.create_new_room(req.config.clone(), &self);
                 CreateRoomResponse {
                     join_code,
                     teams,
@@ -59,5 +60,13 @@ impl GameClient {
                 }
             }
         }
+    }
+
+    pub fn identity(&self) -> &PlayerIdentity {
+        &self.identity
+    }
+
+    pub fn get_protocol(&self) -> Arc<Protocol> {
+        self.protocol.clone()
     }
 }

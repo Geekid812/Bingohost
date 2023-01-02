@@ -2,12 +2,15 @@ use serde::Serialize;
 
 use crate::{config::TEAMS, gameroom::PlayerData, util::color::RgbColor};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TeamId(pub usize);
+
 #[derive(Clone)]
 pub struct GameTeam<'a> {
-    pub id: usize,
+    pub id: TeamId,
     pub name: &'static str,
     pub color: RgbColor,
-    pub members: Vec<&'a PlayerData<'a>>,
+    pub members: Vec<&'a PlayerData>,
 }
 
 impl<'a> GameTeam<'a> {
@@ -15,7 +18,7 @@ impl<'a> GameTeam<'a> {
         let (name, color_string) = TEAMS[id];
         let color = RgbColor::from_hex(color_string).expect("team color parsing failed");
         Self {
-            id,
+            id: TeamId(id),
             name,
             color,
             members: Vec::new(),
@@ -41,7 +44,7 @@ pub struct NetworkTeam {
 impl<'a> From<&GameTeam<'_>> for NetworkTeam {
     fn from(value: &GameTeam<'_>) -> Self {
         Self {
-            id: value.id,
+            id: value.id.0,
             name: value.name,
             color: value.color,
         }

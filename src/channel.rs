@@ -1,12 +1,10 @@
-use std::sync::Arc;
-use tokio::sync::RwLock;
-
 use futures::future::join_all;
+use std::sync::Arc;
 
 use crate::protocol::Protocol;
 
 pub struct Channel {
-    clients: Vec<Arc<RwLock<Protocol>>>,
+    clients: Vec<Arc<Protocol>>,
 }
 
 impl Channel {
@@ -16,13 +14,13 @@ impl Channel {
         }
     }
 
-    pub fn subscribe(&mut self, client: Arc<RwLock<Protocol>>) {
+    pub fn subscribe(&mut self, client: Arc<Protocol>) {
         self.clients.push(client);
     }
 
     pub async fn broadcast(&mut self, message: String) {
-        async fn acquire_and_send(protocol: &mut Arc<RwLock<Protocol>>, msg: &str) {
-            protocol.write().await.send(msg);
+        async fn acquire_and_send(protocol: &mut Arc<Protocol>, msg: &str) {
+            protocol.send(msg).await.expect("channel broadcast failed");
         }
 
         let futures = self

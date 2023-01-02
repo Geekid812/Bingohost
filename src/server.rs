@@ -3,10 +3,11 @@ use std::sync::{Arc, Mutex};
 use tokio::join;
 
 use crate::{
+    client::GameClient,
     config,
     gamemap::{MapStock, Receiver, Sender},
-    gameroom::{GameRoom, RoomConfiguration},
-    gameteam::NetworkTeam,
+    gameroom::{GameRoom, PlayerData, RoomConfiguration},
+    gameteam::{NetworkTeam, TeamId},
 };
 
 pub struct GameServer {
@@ -29,10 +30,16 @@ impl GameServer {
         join! { self.maps.fetch_loop(maps_rx) };
     }
 
-    pub fn create_new_room(&self, config: RoomConfiguration) -> (String, Vec<NetworkTeam>) {
+    pub fn create_new_room(
+        &self,
+        config: RoomConfiguration,
+        host: &GameClient,
+    ) -> (String, Vec<NetworkTeam>) {
         let mut room = GameRoom::create(config);
         room.create_team();
         room.create_team();
+        room.player_join(&host);
+
         let teams = room
             .teams
             .iter()

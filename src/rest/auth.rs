@@ -46,7 +46,7 @@ impl Authenticator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PlayerIdentity {
     pub account_id: String,
     pub display_name: String,

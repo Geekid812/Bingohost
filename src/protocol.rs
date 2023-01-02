@@ -4,7 +4,9 @@ use serde_repr::Serialize_repr;
 use std::io;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
+use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
 use crate::config;
@@ -12,15 +14,18 @@ use crate::rest::auth::{Authenticator, PlayerIdentity, ValidationError};
 use crate::util::version::Version;
 
 pub struct Protocol {
-    socket: TcpStream,
+    reader: Mutex<OwnedReadHalf>,
+    writer: Mutex<OwnedWriteHalf>,
     auth: Arc<Authenticator>,
     state: ConnectionState,
 }
 
 impl Protocol {
     pub fn new(socket: TcpStream, auth: Arc<Authenticator>) -> Self {
+        let (reader, writer) = socket.into_split();
         Self {
-            socket,
+            reader: Mutex::new(reader),
+            writer: Mutex::new(writer),
             auth,
             state: ConnectionState::Closed,
         }
@@ -110,26 +115,28 @@ impl Protocol {
         .unwrap_or_default();
     }
 
-    pub async fn recv(&mut self) -> io::Result<String> {
+    pub async fn recv(&self) -> io::Result<String> {
         let mut buf = [0; 4];
-        self.socket.read_exact(&mut buf).await?;
+        let mut reader = self.reader.lock().await;
+        reader.read_exact(&mut buf).await?;
         let size = i32::from_le_bytes(buf);
         let mut msg_buf = vec![0; size as usize];
-        self.socket.read_exact(&mut msg_buf).await?;
+        reader.read_exact(&mut msg_buf).await?;
         let message = String::from_utf8(msg_buf)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         Ok(message)
     }
 
-    pub async fn send(&mut self, message: &str) -> io::Result<()> {
+    pub async fn send(&self, message: &str) -> io::Result<()> {
         let f = (message.len() as i32).to_le_bytes();
         let msg_buf = message.as_bytes();
-        self.socket.write_all(&f).await?;
-        self.socket.write_all(&msg_buf).await?;
+        let mut writer = self.writer.lock().await;
+        writer.write_all(&f).await?;
+        writer.write_all(&msg_buf).await?;
         Ok(())
     }
 
-    pub async fn error(&mut self, err: &str) {
+    pub async fn error(&self, err: &str) {
         // TODO: stub
         error!(err);
     }

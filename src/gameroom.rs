@@ -4,8 +4,9 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::{
     channel::Channel,
+    client::GameClient,
     config::{JOINCODE_CHARS, JOINCODE_LENGTH, TEAMS},
-    gameteam::GameTeam,
+    gameteam::{GameTeam, TeamId},
     rest::auth::PlayerIdentity,
 };
 
@@ -13,7 +14,7 @@ pub struct GameRoom<'a> {
     config: RoomConfiguration,
     join_code: String,
     channel: Channel,
-    pub members: Vec<PlayerData<'a>>,
+    pub members: Vec<PlayerData>,
     pub teams: Vec<GameTeam<'a>>,
 }
 
@@ -57,13 +58,21 @@ impl<'a> GameRoom<'a> {
     }
 
     fn team_exsits(&self, id: usize) -> bool {
-        self.teams.iter().any(|t| t.id == id)
+        self.teams.iter().any(|t| t.id.0 == id)
+    }
+
+    pub fn player_join(&mut self, client: &GameClient) {
+        self.members.push(PlayerData {
+            identity: client.identity().clone(),
+            team: None,
+        });
+        self.channel.subscribe(client.get_protocol());
     }
 }
 
-pub struct PlayerData<'a> {
+pub struct PlayerData {
     pub identity: PlayerIdentity,
-    pub team: &'a GameTeam<'a>,
+    pub team: Option<TeamId>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
