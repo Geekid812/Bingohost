@@ -6,7 +6,7 @@ use crate::{
     channel::Channel,
     config::{JOINCODE_CHARS, JOINCODE_LENGTH, TEAMS},
     gameteam::GameTeam,
-    util::auth::PlayerIdentity,
+    rest::auth::PlayerIdentity,
 };
 
 pub struct GameRoom<'a> {

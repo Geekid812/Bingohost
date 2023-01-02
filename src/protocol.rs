@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
 use serde_repr::Serialize_repr;
-use std::error::Error;
 use std::io;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -9,10 +8,8 @@ use tokio::net::TcpStream;
 use tracing::{error, info, warn};
 
 use crate::config;
-use crate::util::{
-    auth::{Authenticator, PlayerIdentity, ValidationError},
-    version::Version,
-};
+use crate::rest::auth::{Authenticator, PlayerIdentity, ValidationError};
+use crate::util::version::Version;
 
 pub struct Protocol {
     socket: TcpStream,

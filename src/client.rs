@@ -1,24 +1,18 @@
-use std::sync::{Arc, Mutex};
-
 use crate::config::TEAMS;
 use crate::gameroom::{GameRoom, RoomConfiguration};
 use crate::protocol::Protocol;
 use crate::requests::{BaseRequest, BaseResponse, CreateRoomResponse, RequestVariant, Response};
-use crate::server::GameServer;
-use crate::util::auth::PlayerIdentity;
+use crate::rest::auth::PlayerIdentity;
+use crate::GlobalServer;
 
 pub struct GameClient {
-    server: Arc<Mutex<GameServer>>,
+    server: GlobalServer,
     protocol: Protocol,
     identity: PlayerIdentity,
 }
 
 impl GameClient {
-    pub fn new(
-        server: Arc<Mutex<GameServer>>,
-        protocol: Protocol,
-        identity: PlayerIdentity,
-    ) -> Self {
+    pub fn new(server: GlobalServer, protocol: Protocol, identity: PlayerIdentity) -> Self {
         Self {
             server,
             protocol,
@@ -57,8 +51,7 @@ impl GameClient {
     pub async fn handle(&mut self, msg: &RequestVariant) -> impl Response {
         match msg {
             RequestVariant::CreateRoom(req) => {
-                let mut lock = self.server.lock().expect("lock poisoned");
-                let (join_code, teams) = lock.create_new_room(req.config.clone());
+                let (join_code, teams) = self.server.create_new_room(req.config.clone());
                 CreateRoomResponse {
                     join_code,
                     teams,

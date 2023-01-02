@@ -1,20 +1,26 @@
+use server::GameServer;
 use std::{
     net::SocketAddr,
+    pin::Pin,
     sync::{Arc, Mutex},
 };
-use tokio::net::TcpSocket;
+use tokio::{net::TcpSocket, sync::mpsc::unbounded_channel};
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
 
 pub mod channel;
 pub mod client;
 pub mod config;
+pub mod gamemap;
 pub mod gameroom;
 pub mod gameteam;
 pub mod protocol;
 pub mod requests;
+pub mod rest;
 pub mod server;
 pub mod util;
+
+pub type GlobalServer = Arc<GameServer>;
 
 #[tokio::main]
 async fn main() {
@@ -27,7 +33,7 @@ async fn main() {
 
     use config::routes::openplanet as route;
     let client = reqwest::Client::new();
-    let authenticator = util::auth::Authenticator::new(
+    let authenticator = rest::auth::Authenticator::new(
         client,
         (route::BASE.to_owned() + route::AUTH_VALIDATE)
             .parse()
@@ -35,7 +41,10 @@ async fn main() {
     );
     let auth_arc = Arc::new(authenticator);
 
-    let server_arc = Arc::new(Mutex::new(server::GameServer::new()));
+    let (maps_tx, maps_rx) = unbounded_channel();
+    let server = server::GameServer::new(maps_tx);
+    let server_arc: GlobalServer = Arc::new(server);
+    tokio::spawn(server_arc.clone().spawn(maps_rx));
 
     let socket = TcpSocket::new_v4().expect("ipv4 socket to be created");
     socket

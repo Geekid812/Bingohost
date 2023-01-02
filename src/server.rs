@@ -1,19 +1,35 @@
+use std::sync::{Arc, Mutex};
+
+use tokio::join;
+
 use crate::{
+    config,
+    gamemap::{MapStock, Receiver, Sender},
     gameroom::{GameRoom, RoomConfiguration},
-    gameteam::{GameTeam, NetworkTeam},
+    gameteam::NetworkTeam,
 };
 
 pub struct GameServer {
     // rooms never have any shared references, they are always owned by GameServer.
     // therefore, it's okay to declare them 'static
-    rooms: Vec<GameRoom<'static>>,
+    rooms: Mutex<Vec<GameRoom<'static>>>,
+    maps: MapStock,
 }
 
 impl GameServer {
-    pub const fn new() -> Self {
-        Self { rooms: Vec::new() }
+    pub fn new(maps_tx: Sender) -> Self {
+        let map_stock = MapStock::new(config::MAP_QUEUE_SIZE, maps_tx);
+        Self {
+            rooms: Mutex::new(Vec::new()),
+            maps: map_stock,
+        }
     }
-    pub fn create_new_room(&mut self, config: RoomConfiguration) -> (String, Vec<NetworkTeam>) {
+
+    pub async fn spawn(self: Arc<Self>, maps_rx: Receiver) {
+        join! { self.maps.fetch_loop(maps_rx) };
+    }
+
+    pub fn create_new_room(&self, config: RoomConfiguration) -> (String, Vec<NetworkTeam>) {
         let mut room = GameRoom::create(config);
         room.create_team();
         room.create_team();
@@ -23,7 +39,7 @@ impl GameServer {
             .map(|team| NetworkTeam::from(team))
             .collect();
         let code = room.join_code().to_owned();
-        self.rooms.push(room);
+        self.rooms.lock().expect("lock poisoned").push(room);
         (code, teams)
     }
 }
