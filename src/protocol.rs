@@ -4,9 +4,7 @@ use serde_repr::Serialize_repr;
 use std::io;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
-use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
 use crate::config;
@@ -14,18 +12,15 @@ use crate::rest::auth::{Authenticator, PlayerIdentity, ValidationError};
 use crate::util::version::Version;
 
 pub struct Protocol {
-    reader: Mutex<OwnedReadHalf>,
-    writer: Mutex<OwnedWriteHalf>,
+    socket: TcpStream,
     auth: Arc<Authenticator>,
     state: ConnectionState,
 }
 
 impl Protocol {
     pub fn new(socket: TcpStream, auth: Arc<Authenticator>) -> Self {
-        let (reader, writer) = socket.into_split();
         Self {
-            reader: Mutex::new(reader),
-            writer: Mutex::new(writer),
+            socket: socket,
             auth,
             state: ConnectionState::Closed,
         }
@@ -91,7 +86,7 @@ impl Protocol {
         return Some(identity);
     }
 
-    async fn handshake_end(&mut self, code: HandshakeCode) {
+    async fn handshake_end(&self, code: HandshakeCode) {
         self.send(
             &to_string(&HandshakeResponse {
                 code,
@@ -103,7 +98,7 @@ impl Protocol {
         .unwrap_or_default();
     }
 
-    async fn handshake_success(&mut self, identity: &PlayerIdentity) {
+    async fn handshake_success(&self, identity: &PlayerIdentity) {
         self.send(
             &to_string(&HandshakeResponse {
                 code: HandshakeCode::Ok,
@@ -117,7 +112,7 @@ impl Protocol {
 
     pub async fn recv(&self) -> io::Result<String> {
         let mut buf = [0; 4];
-        let mut reader = self.reader.lock().await;
+        let mut reader = &self.socket;
         reader.read_exact(&mut buf).await?;
         let size = i32::from_le_bytes(buf);
         let mut msg_buf = vec![0; size as usize];
@@ -130,7 +125,7 @@ impl Protocol {
     pub async fn send(&self, message: &str) -> io::Result<()> {
         let f = (message.len() as i32).to_le_bytes();
         let msg_buf = message.as_bytes();
-        let mut writer = self.writer.lock().await;
+        let mut writer = &self.socket;
         writer.write_all(&f).await?;
         writer.write_all(&msg_buf).await?;
         Ok(())
