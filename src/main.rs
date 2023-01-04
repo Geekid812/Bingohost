@@ -1,9 +1,5 @@
 use server::GameServer;
-use std::{
-    net::SocketAddr,
-    pin::Pin,
-    sync::{Arc, Mutex},
-};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpSocket, sync::mpsc::unbounded_channel};
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
@@ -11,6 +7,7 @@ use tracing_subscriber::FmtSubscriber;
 pub mod channel;
 pub mod client;
 pub mod config;
+pub mod events;
 pub mod gamemap;
 pub mod gameroom;
 pub mod gameteam;

@@ -1,19 +1,20 @@
 use std::sync::{Arc, Mutex};
 
+use generational_arena::Arena;
 use tokio::join;
 
 use crate::{
     client::GameClient,
     config,
     gamemap::{MapStock, Receiver, Sender},
-    gameroom::{GameRoom, PlayerData, RoomConfiguration},
-    gameteam::{NetworkTeam, TeamId},
+    gameroom::{GameRoom, RoomConfiguration},
+    gameteam::NetworkTeam,
 };
 
+pub type InternalRoomIdentifier = generational_arena::Index;
+
 pub struct GameServer {
-    // rooms never have any shared references, they are always owned by GameServer.
-    // therefore, it's okay to declare them 'static
-    rooms: Mutex<Vec<GameRoom<'static>>>,
+    rooms: Mutex<Arena<GameRoom>>,
     maps: MapStock,
 }
 
@@ -21,7 +22,7 @@ impl GameServer {
     pub fn new(maps_tx: Sender) -> Self {
         let map_stock = MapStock::new(config::MAP_QUEUE_SIZE, maps_tx);
         Self {
-            rooms: Mutex::new(Vec::new()),
+            rooms: Mutex::new(Arena::new()),
             maps: map_stock,
         }
     }
@@ -34,7 +35,7 @@ impl GameServer {
         &self,
         config: RoomConfiguration,
         host: &GameClient,
-    ) -> (String, Vec<NetworkTeam>) {
+    ) -> (InternalRoomIdentifier, String, Vec<NetworkTeam>) {
         let mut room = GameRoom::create(config);
         room.create_team();
         room.create_team();
@@ -46,7 +47,13 @@ impl GameServer {
             .map(|team| NetworkTeam::from(team))
             .collect();
         let code = room.join_code().to_owned();
-        self.rooms.lock().expect("lock poisoned").push(room);
-        (code, teams)
+        let ident = self.rooms.lock().expect("lock poisoned").insert(room);
+        (ident, code, teams)
+    }
+
+    pub fn change_team(&self, room: InternalRoomIdentifier, player: &GameClient, team: usize) {
+        if let Some(room) = self.rooms.lock().expect("lock poisoned").get(room) {
+            // TODO
+        }
     }
 }

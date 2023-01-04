@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
 use crate::config::TEAMS;
+use crate::events::{ClientEventVariant, ServerEventVariant};
 use crate::protocol::Protocol;
-use crate::requests::{
-    BaseRequest, BaseResponse, ChangeTeamResponse, CreateRoomRequest, CreateRoomResponse,
-    RequestVariant, Response, ResponseVariant,
-};
+use crate::requests::{BaseRequest, CreateRoomResponse, RequestVariant, ResponseVariant};
 use crate::rest::auth::PlayerIdentity;
+use crate::server::InternalRoomIdentifier;
 use crate::GlobalServer;
 
 pub struct GameClient {
     server: GlobalServer,
     protocol: Arc<Protocol>,
     identity: PlayerIdentity,
+    room_id: Option<InternalRoomIdentifier>,
 }
 
 impl GameClient {
@@ -21,6 +21,7 @@ impl GameClient {
             server,
             protocol: Arc::new(protocol),
             identity,
+            room_id: None,
         }
     }
 
@@ -28,22 +29,24 @@ impl GameClient {
         loop {
             let data = self.protocol.recv().await;
             if let Ok(text) = data {
-                let request: BaseRequest = match serde_json::from_str(&text) {
-                    Ok(m) => m,
-                    Err(e) => {
+                // Match a request
+                if let Ok(request) = serde_json::from_str::<BaseRequest>(&text) {
+                    let res = self.handle_request(&request.variant).await;
+                    let response = request.reply(res);
+                    let sent = self
+                        .protocol
+                        .send(&serde_json::to_string(&response).expect("response serialization"))
+                        .await;
+                    if let Err(e) = sent {
                         self.protocol.error(&e.to_string()).await;
-                        continue;
+                        return;
                     }
-                };
-                let res = self.handle(&request.variant).await;
-                let response = request.reply(res);
-                let sent = self
-                    .protocol
-                    .send(&serde_json::to_string(&response).expect("response serialization"))
-                    .await;
-                if let Err(e) = sent {
-                    self.protocol.error(&e.to_string()).await;
-                    return;
+                } else {
+                    // Match an event
+                    match serde_json::from_str::<ClientEventVariant>(&text) {
+                        Ok(event) => self.handle_event(&event).await,
+                        Err(e) => self.protocol.error(&e.to_string()).await,
+                    };
                 }
             } else if let Err(e) = data {
                 self.protocol.error(&e.to_string()).await;
@@ -52,17 +55,39 @@ impl GameClient {
         }
     }
 
-    async fn handle(&mut self, variant: &RequestVariant) -> ResponseVariant {
+    async fn handle_request(&mut self, variant: &RequestVariant) -> ResponseVariant {
         match variant {
             RequestVariant::CreateRoom(req) => {
-                let (join_code, teams) = self.server.create_new_room(req.config.clone(), &self);
+                let (ident, join_code, teams) =
+                    self.server.create_new_room(req.config.clone(), &self);
+                self.room_id = Some(ident);
                 ResponseVariant::CreateRoom(CreateRoomResponse {
                     join_code,
                     teams,
                     max_teams: TEAMS.len(),
                 })
             }
-            RequestVariant::ChangeTeam(_req) => ResponseVariant::ChangeTeam(ChangeTeamResponse {}), // TODO
+        }
+    }
+
+    async fn handle_event(&mut self, variant: &ClientEventVariant) {
+        match variant {
+            ClientEventVariant::ChangeTeam(event) => {
+                if let Some(room) = self.room_id {
+                    self.server.change_team(room, &self, event.team_id);
+                }
+            }
+        }
+    }
+
+    async fn fire_event(&mut self, event: ServerEventVariant) {
+        let sent = self
+            .protocol
+            .send(&serde_json::to_string(&event).expect("event serialization"))
+            .await;
+        if let Err(e) = sent {
+            self.protocol.error(&e.to_string()).await;
+            return;
         }
     }
 

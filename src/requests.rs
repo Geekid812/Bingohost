@@ -47,17 +47,15 @@ pub struct BaseResponse {
 }
 
 #[derive(Deserialize)]
-#[serde(untagged)]
+#[serde(tag = "request")]
 pub enum RequestVariant {
     CreateRoom(CreateRoomRequest),
-    ChangeTeam(ChangeTeamRequest),
 }
 
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum ResponseVariant {
     CreateRoom(CreateRoomResponse),
-    ChangeTeam(ChangeTeamResponse),
 }
 
 #[derive(Deserialize)]
@@ -74,13 +72,3 @@ pub struct CreateRoomResponse {
 }
 
 impl_request!(CreateRoomRequest, CreateRoomResponse);
-
-#[derive(Deserialize)]
-pub struct ChangeTeamRequest {
-    pub team: usize,
-}
-
-#[derive(Serialize)]
-pub struct ChangeTeamResponse {}
-
-impl_request!(ChangeTeamRequest, ChangeTeamResponse);

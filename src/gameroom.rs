@@ -10,15 +10,15 @@ use crate::{
     rest::auth::PlayerIdentity,
 };
 
-pub struct GameRoom<'a> {
+pub struct GameRoom {
     config: RoomConfiguration,
     join_code: String,
     channel: Channel,
     pub members: Vec<PlayerData>,
-    pub teams: Vec<GameTeam<'a>>,
+    pub teams: Vec<GameTeam>,
 }
 
-impl<'a> GameRoom<'a> {
+impl GameRoom {
     pub fn create(config: RoomConfiguration) -> Self {
         let mut rng = rand::thread_rng();
         let uniform = Uniform::from(0..JOINCODE_CHARS.len());
@@ -78,6 +78,9 @@ pub struct PlayerData {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct RoomConfiguration {
     pub size: u32,
+    pub randomize: bool,
+    pub chat_enabled: bool,
+    pub grid_size: u8,
     pub selection: MapMode,
     pub medal: Medal,
     pub time_limit: u32,
