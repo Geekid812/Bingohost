@@ -1,25 +1,30 @@
+use generational_arena::Arena;
 use rand::{distributions::Uniform, prelude::Distribution, Rng};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::{
-    channel::Channel,
+    channel::ChannelAddress,
     client::GameClient,
     config::{JOINCODE_CHARS, JOINCODE_LENGTH, TEAMS},
-    gameteam::{GameTeam, TeamId},
+    gameteam::{GameTeam, TeamIdentifier},
     rest::auth::PlayerIdentity,
 };
+
+pub type RoomIdentifier = generational_arena::Index;
+pub type PlayerIdentifier = generational_arena::Index;
+pub type PlayerRef = (RoomIdentifier, PlayerIdentifier);
 
 pub struct GameRoom {
     config: RoomConfiguration,
     join_code: String,
-    channel: Channel,
-    pub members: Vec<PlayerData>,
-    pub teams: Vec<GameTeam>,
+    members: Arena<PlayerData>,
+    teams: Vec<GameTeam>,
+    channel: ChannelAddress,
 }
 
 impl GameRoom {
-    pub fn create(config: RoomConfiguration) -> Self {
+    pub fn create(config: RoomConfiguration, channel: ChannelAddress) -> Self {
         let mut rng = rand::thread_rng();
         let uniform = Uniform::from(0..JOINCODE_CHARS.len());
         let join_code: String = (0..JOINCODE_LENGTH)
@@ -27,52 +32,101 @@ impl GameRoom {
             .collect();
 
         Self {
-            config,
+            config: config,
             join_code,
-            channel: Channel::new(),
-            members: Vec::new(),
+            members: Arena::new(),
             teams: Vec::new(),
+            channel,
         }
     }
 
     pub fn join_code(&self) -> &str {
-        return &self.join_code;
+        &self.join_code
     }
 
     pub fn config(&self) -> &RoomConfiguration {
-        return &self.config;
+        &self.config
     }
 
-    pub fn create_team(&mut self) {
-        if self.teams.len() >= TEAMS.len() {
+    pub fn channel(&self) -> ChannelAddress {
+        self.channel.clone()
+    }
+
+    pub fn players(&self) -> Vec<NetworkPlayer> {
+        self.members
+            .iter()
+            .map(|(_, player)| NetworkPlayer::from(player))
+            .collect()
+    }
+
+    pub fn teams(&self) -> Vec<GameTeam> {
+        self.teams.clone()
+    }
+
+    pub fn create_team(&mut self, channel: ChannelAddress) -> &GameTeam {
+        let team_count = self.teams.len();
+        if team_count >= TEAMS.len() {
             panic!("attempted to create more than {} teams", TEAMS.len());
         }
 
         let mut rng = rand::thread_rng();
-        let mut id = rng.gen_range(0..TEAMS.len());
-        while self.team_exsits(id) {
-            id = rng.gen_range(0..TEAMS.len());
+        let mut idx = rng.gen_range(0..TEAMS.len());
+        while self.team_exsits_with_index(idx) {
+            idx = rng.gen_range(0..TEAMS.len());
         }
 
-        self.teams.push(GameTeam::new(id));
+        self.teams.push(GameTeam::new(team_count, idx, channel));
+        self.teams.last().unwrap()
     }
 
     fn team_exsits(&self, id: usize) -> bool {
-        self.teams.iter().any(|t| t.id.0 == id)
+        self.teams.iter().any(|t| t.id == id)
     }
 
-    pub fn player_join(&mut self, client: &GameClient) {
-        self.members.push(PlayerData {
+    fn team_exsits_with_index(&self, idx: usize) -> bool {
+        self.teams.iter().any(|t| t.gen_index == idx)
+    }
+
+    pub fn player_join(&mut self, client: &GameClient) -> PlayerIdentifier {
+        let team = if !self.config.randomize {
+            Some(0) // TODO: sort players in teams upon join
+        } else {
+            None
+        };
+        self.members.insert(PlayerData {
             identity: client.identity().clone(),
-            team: None,
-        });
-        self.channel.subscribe(client.get_protocol());
+            team,
+        })
+    }
+
+    pub fn change_team(&mut self, player: PlayerIdentifier, team: TeamIdentifier) {
+        if !self.team_exsits(team) {
+            return;
+        }
+        if let Some(data) = self.members.get_mut(player) {
+            data.team = Some(team);
+        }
     }
 }
 
 pub struct PlayerData {
     pub identity: PlayerIdentity,
-    pub team: Option<TeamId>,
+    pub team: Option<TeamIdentifier>,
+}
+
+#[derive(Serialize)]
+pub struct NetworkPlayer {
+    pub name: String,
+    pub team: Option<TeamIdentifier>,
+}
+
+impl From<&PlayerData> for NetworkPlayer {
+    fn from(value: &PlayerData) -> Self {
+        Self {
+            name: value.identity.display_name.clone(),
+            team: value.team,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -89,7 +143,7 @@ pub struct RoomConfiguration {
 }
 
 #[derive(Clone, Copy, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
+#[repr(u32)]
 pub enum MapMode {
     TOTD,
     RandomTMX,
@@ -97,7 +151,7 @@ pub enum MapMode {
 }
 
 #[derive(Clone, Copy, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
+#[repr(u32)]
 pub enum Medal {
     Author,
     Gold,

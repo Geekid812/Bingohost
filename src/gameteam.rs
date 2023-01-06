@@ -1,25 +1,30 @@
 use serde::Serialize;
 
-use crate::{config::TEAMS, util::color::RgbColor};
+use crate::{channel::ChannelAddress, config::TEAMS, util::color::RgbColor};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TeamId(pub usize);
+pub type TeamIdentifier = usize;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct GameTeam {
-    pub id: TeamId,
+    pub id: TeamIdentifier,
     pub name: &'static str,
     pub color: RgbColor,
+    #[serde(skip_serializing)]
+    pub gen_index: usize,
+    #[serde(skip_serializing)]
+    pub channel_id: ChannelAddress,
 }
 
 impl GameTeam {
-    pub fn new(id: usize) -> Self {
+    pub fn new(id: usize, index: usize, channel_id: ChannelAddress) -> Self {
         let (name, color_string) = TEAMS[id];
         let color = RgbColor::from_hex(color_string).expect("team color parsing failed");
         Self {
-            id: TeamId(id),
+            id: id,
             name,
             color,
+            channel_id,
+            gen_index: index,
         }
     }
 }
@@ -31,20 +36,3 @@ impl PartialEq for GameTeam {
 }
 
 impl Eq for GameTeam {}
-
-#[derive(Serialize)]
-pub struct NetworkTeam {
-    pub id: usize,
-    pub name: &'static str,
-    pub color: RgbColor,
-}
-
-impl From<&GameTeam> for NetworkTeam {
-    fn from(value: &GameTeam) -> Self {
-        Self {
-            id: value.id.0,
-            name: value.name,
-            color: value.color,
-        }
-    }
-}

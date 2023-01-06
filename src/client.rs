@@ -1,18 +1,20 @@
 use std::sync::Arc;
 
+use tracing::info;
+
 use crate::config::TEAMS;
 use crate::events::{ClientEventVariant, ServerEventVariant};
+use crate::gameroom::PlayerRef;
 use crate::protocol::Protocol;
 use crate::requests::{BaseRequest, CreateRoomResponse, RequestVariant, ResponseVariant};
 use crate::rest::auth::PlayerIdentity;
-use crate::server::InternalRoomIdentifier;
 use crate::GlobalServer;
 
 pub struct GameClient {
     server: GlobalServer,
     protocol: Arc<Protocol>,
     identity: PlayerIdentity,
-    room_id: Option<InternalRoomIdentifier>,
+    player_id: Option<PlayerRef>,
 }
 
 impl GameClient {
@@ -21,7 +23,7 @@ impl GameClient {
             server,
             protocol: Arc::new(protocol),
             identity,
-            room_id: None,
+            player_id: None,
         }
     }
 
@@ -29,6 +31,7 @@ impl GameClient {
         loop {
             let data = self.protocol.recv().await;
             if let Ok(text) = data {
+                info!("Received: {}", text);
                 // Match a request
                 if let Ok(request) = serde_json::from_str::<BaseRequest>(&text) {
                     let res = self.handle_request(&request.variant).await;
@@ -58,9 +61,9 @@ impl GameClient {
     async fn handle_request(&mut self, variant: &RequestVariant) -> ResponseVariant {
         match variant {
             RequestVariant::CreateRoom(req) => {
-                let (ident, join_code, teams) =
+                let (player, join_code, teams) =
                     self.server.create_new_room(req.config.clone(), &self);
-                self.room_id = Some(ident);
+                self.player_id = Some(player);
                 ResponseVariant::CreateRoom(CreateRoomResponse {
                     join_code,
                     teams,
@@ -73,8 +76,8 @@ impl GameClient {
     async fn handle_event(&mut self, variant: &ClientEventVariant) {
         match variant {
             ClientEventVariant::ChangeTeam(event) => {
-                if let Some(room) = self.room_id {
-                    self.server.change_team(room, &self, event.team_id);
+                if let Some(player) = self.player_id {
+                    self.server.change_team(player.clone(), event.team_id);
                 }
             }
         }
