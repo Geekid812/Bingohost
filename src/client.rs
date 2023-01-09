@@ -109,6 +109,7 @@ impl GameClient {
 
     fn handle_disconnect(&mut self) {
         info!("Client disconnected: {}", self.identity.display_name);
+        self.protocol.close();
         if let Some(player) = self.player_id {
             self.server.disconnect(player);
         }

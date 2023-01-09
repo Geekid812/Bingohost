@@ -1,5 +1,8 @@
 use generational_arena::Arena;
-use std::sync::{Arc, RwLock};
+use std::{
+    io,
+    sync::{Arc, RwLock},
+};
 use tracing::info;
 
 use crate::{events::ServerEventVariant, protocol::Protocol};
@@ -31,7 +34,16 @@ impl Channel {
     }
 
     async fn send(protocol: Arc<Protocol>, msg: Arc<String>) {
-        protocol.send(&msg).await.expect("channel broadcast failed");
+        match protocol.send(&msg).await {
+            Ok(_) => (),
+            Err(e) => {
+                if e.kind() != io::ErrorKind::NotConnected {
+                    protocol.error(&e.to_string()).await
+                } else {
+                    ()
+                }
+            }
+        };
     }
 }
 
