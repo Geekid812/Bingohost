@@ -17,7 +17,7 @@ pub struct GameTeam {
 
 impl GameTeam {
     pub fn new(id: usize, index: usize, channel_id: ChannelAddress) -> Self {
-        let (name, color_string) = TEAMS[id];
+        let (name, color_string) = TEAMS[index];
         let color = RgbColor::from_hex(color_string).expect("team color parsing failed");
         Self {
             id: id,
