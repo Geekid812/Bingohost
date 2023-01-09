@@ -1,12 +1,13 @@
 use std::sync::{Arc, Mutex};
 
 use generational_arena::Arena;
+use rand::{distributions::Uniform, prelude::Distribution};
 use tokio::join;
 
 use crate::{
     channel::ChannelCollection,
     client::GameClient,
-    config,
+    config::{self, JOINCODE_CHARS, JOINCODE_LENGTH},
     events::ServerEventVariant,
     gamemap::{MapStock, Receiver, Sender},
     gameroom::{GameRoom, JoinRoomError, PlayerRef, RoomConfiguration, RoomIdentifier, RoomStatus},
@@ -38,6 +39,20 @@ impl GameServer {
         config: RoomConfiguration,
         host: &GameClient,
     ) -> (PlayerRef, String, String, Vec<GameTeam>) {
+        // Generate room join code
+        let mut rng = rand::thread_rng();
+        let uniform = Uniform::from(0..JOINCODE_CHARS.len());
+        let mut join_code: String = (0..JOINCODE_LENGTH)
+            .map(|_| JOINCODE_CHARS[uniform.sample(&mut rng)])
+            .collect();
+
+        while self.find_room(&join_code).is_some() {
+            join_code = (0..JOINCODE_LENGTH)
+                .map(|_| JOINCODE_CHARS[uniform.sample(&mut rng)])
+                .collect();
+        }
+
+        // Create room data structure
         let host_name = &host.identity().display_name;
         let mut room = GameRoom::create(
             format!(
@@ -45,10 +60,13 @@ impl GameServer {
                 host_name,
                 if host_name.ends_with('s') { "'" } else { "'s" }
             ),
+            join_code,
             config,
             self.channels.create_one(),
         );
         let room_name = room.name().to_owned();
+
+        // Add the two starting teams and the host
         let team1 = room.create_team(self.channels.create_one()).clone();
         let team2 = room.create_team(self.channels.create_one()).clone();
         let player_id = room

@@ -1,5 +1,5 @@
 use generational_arena::Arena;
-use rand::{distributions::Uniform, prelude::Distribution, Rng};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use thiserror::Error;
@@ -7,7 +7,7 @@ use thiserror::Error;
 use crate::{
     channel::ChannelAddress,
     client::GameClient,
-    config::{JOINCODE_CHARS, JOINCODE_LENGTH, TEAMS},
+    config::TEAMS,
     gameteam::{GameTeam, TeamIdentifier},
     rest::auth::PlayerIdentity,
 };
@@ -26,13 +26,12 @@ pub struct GameRoom {
 }
 
 impl GameRoom {
-    pub fn create(name: String, config: RoomConfiguration, channel: ChannelAddress) -> Self {
-        let mut rng = rand::thread_rng();
-        let uniform = Uniform::from(0..JOINCODE_CHARS.len());
-        let join_code: String = (0..JOINCODE_LENGTH)
-            .map(|_| JOINCODE_CHARS[uniform.sample(&mut rng)])
-            .collect();
-
+    pub fn create(
+        name: String,
+        join_code: String,
+        config: RoomConfiguration,
+        channel: ChannelAddress,
+    ) -> Self {
         Self {
             name,
             config: config,
