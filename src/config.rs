@@ -16,10 +16,7 @@ pub const TEAMS: [(&'static str, &'static str); 3] =
     [("Red", "FF0000"), ("Green", "00FF00"), ("Blue", "0000FF")];
 
 pub const JOINCODE_LENGTH: u32 = 6;
-pub const JOINCODE_CHARS: [char; 26] = [
-    'A', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'T', 'U', 'V', 'W',
-    'X', 'Y', '3', '4', '6', '7', '9',
-];
+pub const JOINCODE_CHARS: [char; 10] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 pub mod routes {
     pub mod openplanet {
