@@ -1,23 +1,15 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{gameroom::NetworkPlayer, gameteam::GameTeam};
+use crate::gameroom::RoomStatus;
 
 #[derive(Deserialize)]
 #[serde(tag = "event")]
 pub enum ClientEventVariant {
-    ChangeTeam(ChangeTeamEvent),
+    ChangeTeam { team_id: usize },
 }
 
 #[derive(Serialize)]
 #[serde(tag = "event")]
 pub enum ServerEventVariant {
-    RoomUpdate {
-        members: Vec<NetworkPlayer>,
-        teams: Vec<GameTeam>,
-    },
-}
-
-#[derive(Deserialize)]
-pub struct ChangeTeamEvent {
-    pub team_id: usize,
+    RoomUpdate(RoomStatus),
 }

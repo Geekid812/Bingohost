@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{gameroom::RoomConfiguration, gameteam::GameTeam};
+use crate::{
+    gameroom::{RoomConfiguration, RoomStatus},
+    gameteam::GameTeam,
+};
 
 #[macro_use]
 mod macros {
@@ -50,12 +53,18 @@ pub struct BaseResponse {
 #[serde(tag = "request")]
 pub enum RequestVariant {
     CreateRoom(CreateRoomRequest),
+    JoinRoom { join_code: String },
 }
 
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum ResponseVariant {
     CreateRoom(CreateRoomResponse),
+    JoinRoom {
+        config: RoomConfiguration,
+        status: RoomStatus,
+    },
+    Error(String),
 }
 
 #[derive(Deserialize)]

@@ -2,6 +2,7 @@ use generational_arena::Arena;
 use rand::{distributions::Uniform, prelude::Distribution, Rng};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use thiserror::Error;
 
 use crate::{
     channel::ChannelAddress,
@@ -63,6 +64,13 @@ impl GameRoom {
         self.teams.clone()
     }
 
+    pub fn status(&self) -> RoomStatus {
+        RoomStatus {
+            members: self.players(),
+            teams: self.teams(),
+        }
+    }
+
     pub fn create_team(&mut self, channel: ChannelAddress) -> &GameTeam {
         let team_count = self.teams.len();
         if team_count >= TEAMS.len() {
@@ -87,7 +95,7 @@ impl GameRoom {
         self.teams.iter().any(|t| t.gen_index == idx)
     }
 
-    pub fn player_join(&mut self, client: &GameClient) -> PlayerIdentifier {
+    fn add_player(&mut self, client: &GameClient, operator: bool) -> PlayerIdentifier {
         let team = if !self.config.randomize {
             Some(0) // TODO: sort players in teams upon join
         } else {
@@ -96,7 +104,20 @@ impl GameRoom {
         self.members.insert(PlayerData {
             identity: client.identity().clone(),
             team,
+            operator,
         })
+    }
+
+    pub fn player_join(
+        &mut self,
+        client: &GameClient,
+        operator: bool,
+    ) -> Result<PlayerIdentifier, JoinRoomError> {
+        // TODO: check that it has started
+        if self.config.size != 0 && self.members.len() as u32 >= self.config.size {
+            return Err(JoinRoomError::PlayerLimitReached);
+        }
+        Ok(self.add_player(client, operator))
     }
 
     pub fn change_team(&mut self, player: PlayerIdentifier, team: TeamIdentifier) {
@@ -109,9 +130,26 @@ impl GameRoom {
     }
 }
 
+#[derive(Serialize)]
+pub struct RoomStatus {
+    pub members: Vec<NetworkPlayer>,
+    pub teams: Vec<GameTeam>,
+}
+
+#[derive(Error, Debug)]
+pub enum JoinRoomError {
+    #[error("The room is already full.")]
+    PlayerLimitReached,
+    #[error("No room was found with code {0}.")]
+    DoesNotExist(String),
+    #[error("The game has already started.")]
+    HasStarted,
+}
+
 pub struct PlayerData {
     pub identity: PlayerIdentity,
     pub team: Option<TeamIdentifier>,
+    pub operator: bool,
 }
 
 #[derive(Serialize)]

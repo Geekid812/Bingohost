@@ -70,14 +70,26 @@ impl GameClient {
                     max_teams: TEAMS.len(),
                 })
             }
+            RequestVariant::JoinRoom { join_code } => {
+                match self.server.join_room(&self, join_code) {
+                    Ok((player, config, status)) => {
+                        self.player_id = Some(player);
+                        ResponseVariant::JoinRoom {
+                            config: config,
+                            status: status,
+                        }
+                    }
+                    Err(e) => ResponseVariant::Error(e.to_string()),
+                }
+            }
         }
     }
 
     async fn handle_event(&mut self, variant: &ClientEventVariant) {
         match variant {
-            ClientEventVariant::ChangeTeam(event) => {
+            ClientEventVariant::ChangeTeam { team_id } => {
                 if let Some(player) = self.player_id {
-                    self.server.change_team(player.clone(), event.team_id);
+                    self.server.change_team(player.clone(), *team_id);
                 }
             }
         }
