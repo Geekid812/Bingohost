@@ -1,3 +1,4 @@
+use std::io::ErrorKind;
 use std::sync::Arc;
 
 use tracing::info;
@@ -30,30 +31,37 @@ impl GameClient {
     pub async fn run(mut self) {
         loop {
             let data = self.protocol.recv().await;
-            if let Ok(text) = data {
-                info!("Received: {}", text);
-                // Match a request
-                if let Ok(request) = serde_json::from_str::<BaseRequest>(&text) {
-                    let res = self.handle_request(&request.variant).await;
-                    let response = request.reply(res);
-                    let sent = self
-                        .protocol
-                        .send(&serde_json::to_string(&response).expect("response serialization"))
-                        .await;
-                    if let Err(e) = sent {
-                        self.protocol.error(&e.to_string()).await;
-                        return;
+            match data {
+                Ok(text) => {
+                    info!("Received: {}", text);
+                    // Match a request
+                    if let Ok(request) = serde_json::from_str::<BaseRequest>(&text) {
+                        let res = self.handle_request(&request.variant).await;
+                        let response = request.reply(res);
+                        let sent = self
+                            .protocol
+                            .send(
+                                &serde_json::to_string(&response).expect("response serialization"),
+                            )
+                            .await;
+                        if let Err(e) = sent {
+                            self.protocol.error(&e.to_string()).await;
+                            return;
+                        }
+                    } else {
+                        // Match an event
+                        match serde_json::from_str::<ClientEventVariant>(&text) {
+                            Ok(event) => self.handle_event(&event).await,
+                            Err(e) => self.protocol.error(&e.to_string()).await,
+                        };
                     }
-                } else {
-                    // Match an event
-                    match serde_json::from_str::<ClientEventVariant>(&text) {
-                        Ok(event) => self.handle_event(&event).await,
-                        Err(e) => self.protocol.error(&e.to_string()).await,
-                    };
                 }
-            } else if let Err(e) = data {
-                self.protocol.error(&e.to_string()).await;
-                return;
+                Err(e) if e.kind() == ErrorKind::UnexpectedEof => {
+                    // Handle disconnection
+                    self.handle_disconnect();
+                    break;
+                }
+                Err(e) => self.protocol.error(&e.to_string()).await,
             }
         }
     }
@@ -61,10 +69,11 @@ impl GameClient {
     async fn handle_request(&mut self, variant: &RequestVariant) -> ResponseVariant {
         match variant {
             RequestVariant::CreateRoom(req) => {
-                let (player, join_code, teams) =
+                let (player, name, join_code, teams) =
                     self.server.create_new_room(req.config.clone(), &self);
                 self.player_id = Some(player);
                 ResponseVariant::CreateRoom(CreateRoomResponse {
+                    name,
                     join_code,
                     teams,
                     max_teams: TEAMS.len(),
@@ -72,9 +81,10 @@ impl GameClient {
             }
             RequestVariant::JoinRoom { join_code } => {
                 match self.server.join_room(&self, join_code) {
-                    Ok((player, config, status)) => {
+                    Ok((player, name, config, status)) => {
                         self.player_id = Some(player);
                         ResponseVariant::JoinRoom {
+                            name,
                             config: config,
                             status: status,
                         }
@@ -94,6 +104,13 @@ impl GameClient {
                     self.server.change_team(player.clone(), *team_id);
                 }
             }
+        }
+    }
+
+    fn handle_disconnect(&mut self) {
+        info!("Client disconnected: {}", self.identity.display_name);
+        if let Some(player) = self.player_id {
+            self.server.disconnect(player);
         }
     }
 

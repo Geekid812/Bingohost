@@ -17,6 +17,7 @@ pub type PlayerIdentifier = generational_arena::Index;
 pub type PlayerRef = (RoomIdentifier, PlayerIdentifier);
 
 pub struct GameRoom {
+    name: String,
     config: RoomConfiguration,
     join_code: String,
     members: Arena<PlayerData>,
@@ -25,7 +26,7 @@ pub struct GameRoom {
 }
 
 impl GameRoom {
-    pub fn create(config: RoomConfiguration, channel: ChannelAddress) -> Self {
+    pub fn create(name: String, config: RoomConfiguration, channel: ChannelAddress) -> Self {
         let mut rng = rand::thread_rng();
         let uniform = Uniform::from(0..JOINCODE_CHARS.len());
         let join_code: String = (0..JOINCODE_LENGTH)
@@ -33,12 +34,17 @@ impl GameRoom {
             .collect();
 
         Self {
+            name,
             config: config,
             join_code,
             members: Arena::new(),
             teams: Vec::new(),
             channel,
         }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn join_code(&self) -> &str {
@@ -105,6 +111,7 @@ impl GameRoom {
             identity: client.identity().clone(),
             team,
             operator,
+            disconnected: false,
         })
     }
 
@@ -118,6 +125,11 @@ impl GameRoom {
             return Err(JoinRoomError::PlayerLimitReached);
         }
         Ok(self.add_player(client, operator))
+    }
+
+    // Returns: whether the room should be closed
+    pub fn player_remove(&mut self, player: PlayerIdentifier) -> bool {
+        self.members.remove(player).map_or(false, |p| p.operator)
     }
 
     pub fn change_team(&mut self, player: PlayerIdentifier, team: TeamIdentifier) {
@@ -150,6 +162,7 @@ pub struct PlayerData {
     pub identity: PlayerIdentity,
     pub team: Option<TeamIdentifier>,
     pub operator: bool,
+    pub disconnected: bool,
 }
 
 #[derive(Serialize)]

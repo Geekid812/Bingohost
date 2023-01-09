@@ -66,4 +66,8 @@ impl ChannelCollection {
             .expect("broadcasting in a channel that exists")
             .broadcast(message)
     }
+
+    pub fn remove(&self, address: ChannelAddress) {
+        self.arena.write().expect("lock poisioned").remove(address);
+    }
 }

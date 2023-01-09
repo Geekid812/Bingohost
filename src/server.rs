@@ -37,8 +37,18 @@ impl GameServer {
         &self,
         config: RoomConfiguration,
         host: &GameClient,
-    ) -> (PlayerRef, String, Vec<GameTeam>) {
-        let mut room = GameRoom::create(config, self.channels.create_one());
+    ) -> (PlayerRef, String, String, Vec<GameTeam>) {
+        let host_name = &host.identity().display_name;
+        let mut room = GameRoom::create(
+            format!(
+                "{}{} Bingo game",
+                host_name,
+                if host_name.ends_with('s') { "'" } else { "'s" }
+            ),
+            config,
+            self.channels.create_one(),
+        );
+        let room_name = room.name().to_owned();
         let team1 = room.create_team(self.channels.create_one()).clone();
         let team2 = room.create_team(self.channels.create_one()).clone();
         let player_id = room
@@ -48,7 +58,7 @@ impl GameServer {
 
         let code = room.join_code().to_owned();
         let room_id = self.rooms.lock().expect("lock poisoned").insert(room);
-        ((room_id, player_id), code, vec![team1, team2])
+        ((room_id, player_id), room_name, code, vec![team1, team2])
     }
 
     pub fn change_team(&self, (room, player): PlayerRef, team: TeamIdentifier) {
@@ -74,7 +84,7 @@ impl GameServer {
         &self,
         client: &GameClient,
         join_code: &str,
-    ) -> Result<(PlayerRef, RoomConfiguration, RoomStatus), JoinRoomError> {
+    ) -> Result<(PlayerRef, String, RoomConfiguration, RoomStatus), JoinRoomError> {
         let room_id = self
             .find_room(join_code)
             .ok_or(JoinRoomError::DoesNotExist(join_code.to_owned()))?;
@@ -87,6 +97,25 @@ impl GameServer {
         self.channels
             .broadcast(channel, ServerEventVariant::RoomUpdate(room.status()));
         self.channels.subscribe(channel, client.get_protocol());
-        Ok(((room_id, player_id), room.config().clone(), room.status()))
+        Ok((
+            (room_id, player_id),
+            room.name().to_owned(),
+            room.config().clone(),
+            room.status(),
+        ))
+    }
+
+    pub fn disconnect(&self, (room_id, player): PlayerRef) {
+        let mut lock = self.rooms.lock().expect("lock poisoned");
+        if let Some(room) = lock.get_mut(room_id) {
+            let should_close = room.player_remove(player);
+            if should_close {
+                let room = lock.remove(room_id).expect("room exists");
+                self.channels.remove(room.channel());
+                for team in &room.teams() {
+                    self.channels.remove(team.channel_id);
+                }
+            }
+        }
     }
 }

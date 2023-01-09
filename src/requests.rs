@@ -61,6 +61,7 @@ pub enum RequestVariant {
 pub enum ResponseVariant {
     CreateRoom(CreateRoomResponse),
     JoinRoom {
+        name: String,
         config: RoomConfiguration,
         status: RoomStatus,
     },
@@ -77,6 +78,7 @@ pub struct CreateRoomRequest {
 
 #[derive(Serialize)]
 pub struct CreateRoomResponse {
+    pub name: String,
     pub join_code: String,
     pub max_teams: usize,
     pub teams: Vec<GameTeam>,
