@@ -79,7 +79,9 @@ impl GameClient {
                             status: status,
                         }
                     }
-                    Err(e) => ResponseVariant::Error(e.to_string()),
+                    Err(e) => ResponseVariant::Error {
+                        error: e.to_string(),
+                    },
                 }
             }
         }

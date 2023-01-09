@@ -64,7 +64,9 @@ pub enum ResponseVariant {
         config: RoomConfiguration,
         status: RoomStatus,
     },
-    Error(String),
+    Error {
+        error: String,
+    },
 }
 
 #[derive(Deserialize)]
