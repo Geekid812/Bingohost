@@ -11,7 +11,10 @@ use crate::requests::{BaseRequest, CreateRoomResponse, RequestVariant, ResponseV
 use crate::rest::auth::PlayerIdentity;
 use crate::GlobalServer;
 
+pub type ClientId = u32;
+
 pub struct GameClient {
+    id: ClientId,
     server: GlobalServer,
     protocol: Arc<Protocol>,
     identity: PlayerIdentity,
@@ -19,8 +22,14 @@ pub struct GameClient {
 }
 
 impl GameClient {
-    pub fn new(server: GlobalServer, protocol: Protocol, identity: PlayerIdentity) -> Self {
+    pub fn new(
+        id: ClientId,
+        server: GlobalServer,
+        protocol: Protocol,
+        identity: PlayerIdentity,
+    ) -> Self {
         Self {
+            id,
             server,
             protocol: Arc::new(protocol),
             identity,
@@ -104,6 +113,11 @@ impl GameClient {
                     self.server.change_team(player.clone(), *team_id);
                 }
             }
+            ClientEventVariant::LeaveRoom => {
+                if let Some(player) = self.player_id {
+                    self.server.leave(self.id, player);
+                }
+            }
         }
     }
 
@@ -111,7 +125,7 @@ impl GameClient {
         info!("Client disconnected: {}", self.identity.display_name);
         self.protocol.close();
         if let Some(player) = self.player_id {
-            self.server.disconnect(player);
+            self.server.disconnect(self.id, player);
         }
     }
 
@@ -132,5 +146,9 @@ impl GameClient {
 
     pub fn get_protocol(&self) -> Arc<Protocol> {
         self.protocol.clone()
+    }
+
+    pub fn get_id(&self) -> ClientId {
+        self.id
     }
 }

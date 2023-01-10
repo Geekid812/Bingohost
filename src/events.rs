@@ -6,6 +6,7 @@ use crate::gameroom::RoomStatus;
 #[serde(tag = "event")]
 pub enum ClientEventVariant {
     ChangeTeam { team_id: usize },
+    LeaveRoom,
 }
 
 #[derive(Serialize)]

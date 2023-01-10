@@ -76,6 +76,14 @@ impl GameRoom {
         }
     }
 
+    pub fn get_player(&self, player: PlayerIdentifier) -> Option<&PlayerData> {
+        self.members.get(player)
+    }
+
+    pub fn get_team(&self, player: TeamIdentifier) -> Option<&GameTeam> {
+        self.teams.get(player)
+    }
+
     pub fn create_team(&mut self, channel: ChannelAddress) -> &GameTeam {
         let team_count = self.teams.len();
         if team_count >= TEAMS.len() {

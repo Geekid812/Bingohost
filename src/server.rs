@@ -6,7 +6,7 @@ use tokio::join;
 
 use crate::{
     channel::ChannelCollection,
-    client::GameClient,
+    client::{ClientId, GameClient},
     config::{self, JOINCODE_CHARS, JOINCODE_LENGTH},
     events::ServerEventVariant,
     gamemap::{MapStock, Receiver, Sender},
@@ -72,7 +72,7 @@ impl GameServer {
         let player_id = room
             .player_join(&host, true)
             .expect("adding host to a new room");
-        self.channels.subscribe(room.channel(), host.get_protocol());
+        self.channels.subscribe(room.channel(), host);
 
         let code = room.join_code().to_owned();
         let room_id = self.rooms.lock().expect("lock poisoned").insert(room);
@@ -114,7 +114,7 @@ impl GameServer {
         let channel = room.channel();
         self.channels
             .broadcast(channel, ServerEventVariant::RoomUpdate(room.status()));
-        self.channels.subscribe(channel, client.get_protocol());
+        self.channels.subscribe(channel, client);
         Ok((
             (room_id, player_id),
             room.name().to_owned(),
@@ -123,9 +123,23 @@ impl GameServer {
         ))
     }
 
-    pub fn disconnect(&self, (room_id, player): PlayerRef) {
+    pub fn disconnect(&self, id: ClientId, player: PlayerRef) {
+        self.client_removed(id, player, false);
+    }
+
+    pub fn leave(&self, id: ClientId, player: PlayerRef) {
+        self.client_removed(id, player, true);
+    }
+
+    fn client_removed(&self, id: ClientId, (room_id, player): PlayerRef, _explicit: bool) {
         let mut lock = self.rooms.lock().expect("lock poisoned");
         if let Some(room) = lock.get_mut(room_id) {
+            self.channels.unsubscribe(room.channel(), id);
+            if let Some(team_id) = room.get_player(player).and_then(|p| p.team) {
+                let team_channel = room.get_team(team_id).expect("team to exist").channel_id;
+                self.channels.unsubscribe(team_channel, id);
+            }
+
             let should_close = room.player_remove(player);
             if should_close {
                 let room = lock.remove(room_id).expect("room exists");

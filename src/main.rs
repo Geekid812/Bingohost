@@ -1,5 +1,11 @@
 use server::GameServer;
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
+};
 use tokio::{net::TcpSocket, sync::mpsc::unbounded_channel};
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
@@ -18,6 +24,7 @@ pub mod server;
 pub mod util;
 
 pub type GlobalServer = Arc<GameServer>;
+pub static CLIENT_COUNT: AtomicU32 = AtomicU32::new(0);
 
 #[tokio::main]
 async fn main() {
@@ -71,7 +78,8 @@ async fn main() {
                 Some(i) => i,
                 None => return,
             };
-            let player = client::GameClient::new(server, protocol, identity);
+            let client_id = CLIENT_COUNT.fetch_add(1, Ordering::Relaxed);
+            let player = client::GameClient::new(client_id, server, protocol, identity);
             player.run().await;
         });
     }

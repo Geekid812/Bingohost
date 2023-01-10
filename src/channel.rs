@@ -1,34 +1,46 @@
 use generational_arena::Arena;
 use std::{
+    collections::HashMap,
     io,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
 };
 use tracing::info;
 
-use crate::{events::ServerEventVariant, protocol::Protocol};
+use crate::{
+    client::{ClientId, GameClient},
+    events::ServerEventVariant,
+    protocol::Protocol,
+};
 
 pub type ChannelAddress = generational_arena::Index;
 
 pub struct Channel {
-    clients: RwLock<Vec<Arc<Protocol>>>,
+    clients: Mutex<HashMap<ClientId, Arc<Protocol>>>,
 }
 
 impl Channel {
     pub fn new() -> Self {
         Self {
-            clients: RwLock::new(Vec::new()),
+            clients: Mutex::new(HashMap::new()),
         }
     }
 
-    pub fn subscribe(&self, client: Arc<Protocol>) {
-        self.clients.write().expect("lock poisoned").push(client);
+    pub fn subscribe(&self, id: ClientId, client: Arc<Protocol>) {
+        self.clients
+            .lock()
+            .expect("lock poisoned")
+            .insert(id, client);
+    }
+
+    pub fn remove(&self, id: ClientId) {
+        self.clients.lock().expect("lock poisoned").remove(&id);
     }
 
     pub fn broadcast(&self, message: String) {
         info!("Broadcasting: {}", message);
 
         let msg = Arc::new(message);
-        for client in &*self.clients.read().expect("lock poisoned") {
+        for client in self.clients.lock().expect("lock poisoned").values() {
             tokio::spawn(Channel::send(client.clone(), msg.clone()));
         }
     }
@@ -39,9 +51,7 @@ impl Channel {
             Err(e) => {
                 if e.kind() != io::ErrorKind::NotConnected {
                     protocol.error(&e.to_string()).await
-                } else {
-                    ()
-                }
+                };
             }
         };
     }
@@ -63,9 +73,15 @@ impl ChannelCollection {
         self.arena.write().expect("lock poisoned").insert(channel)
     }
 
-    pub fn subscribe(&self, address: ChannelAddress, client: Arc<Protocol>) {
+    pub fn subscribe(&self, address: ChannelAddress, client: &GameClient) {
         if let Some(channel) = self.arena.read().expect("lock poisioned").get(address) {
-            channel.subscribe(client)
+            channel.subscribe(client.get_id(), client.get_protocol());
+        }
+    }
+
+    pub fn unsubscribe(&self, address: ChannelAddress, client: ClientId) {
+        if let Some(channel) = self.arena.read().expect("lock poisioned").get(address) {
+            channel.remove(client);
         }
     }
 
