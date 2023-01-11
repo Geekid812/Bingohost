@@ -1,6 +1,5 @@
-use serde::{Deserialize, Serialize};
-
 use crate::gameroom::{RoomConfiguration, RoomStatus};
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 #[serde(tag = "event")]
@@ -14,4 +13,5 @@ pub enum ClientEventVariant {
 pub enum ServerEventVariant {
     RoomUpdate(RoomStatus),
     RoomConfigUpdate(RoomConfiguration),
+    MapsLoadResult { loaded: bool },
 }

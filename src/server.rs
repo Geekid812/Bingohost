@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use generational_arena::Arena;
 use rand::{distributions::Uniform, prelude::Distribution};
-use tokio::join;
+use tokio::{join, task};
 
 use crate::{
     channel::ChannelCollection,
@@ -10,7 +10,9 @@ use crate::{
     config::{self, JOINCODE_CHARS, JOINCODE_LENGTH},
     events::ServerEventVariant,
     gamemap::{MapStock, Receiver, Sender},
-    gameroom::{GameRoom, JoinRoomError, PlayerRef, RoomConfiguration, RoomIdentifier, RoomStatus},
+    gameroom::{
+        GameRoom, JoinRoomError, MapMode, PlayerRef, RoomConfiguration, RoomIdentifier, RoomStatus,
+    },
     gameteam::{GameTeam, TeamIdentifier},
 };
 
@@ -35,7 +37,7 @@ impl GameServer {
     }
 
     pub fn create_new_room(
-        &self,
+        self: &Arc<Self>,
         config: RoomConfiguration,
         host: &GameClient,
     ) -> (PlayerRef, String, String, Vec<GameTeam>) {
@@ -61,7 +63,7 @@ impl GameServer {
                 if host_name.ends_with('s') { "'" } else { "'s" }
             ),
             join_code,
-            config,
+            config.clone(),
             self.channels.create_one(),
         );
         let room_name = room.name().to_owned();
@@ -76,15 +78,81 @@ impl GameServer {
 
         let code = room.join_code().to_owned();
         let room_id = self.rooms.lock().expect("lock poisoned").insert(room);
+        tokio::spawn(self.clone().load_maps(
+            room_id,
+            config.selection,
+            config.grid_size as usize * config.grid_size as usize,
+        ));
         ((room_id, player_id), room_name, code, vec![team1, team2])
     }
 
-    pub fn edit_room_config(&self, room: RoomIdentifier, config: RoomConfiguration) {
-        // TODO: handle errors
+    async fn load_maps(self: Arc<Self>, room: RoomIdentifier, selection: MapMode, count: usize) {
+        let maps_result = self.maps.get_maps(selection, count).await;
+
+        task::yield_now().await; // make sure we at least yield once (get_maps may not always yield)
         if let Some(room) = self.rooms.lock().expect("lock poisoned").get_mut(room) {
+            match maps_result {
+                Some(maps) => {
+                    // Check if map mode has changed during the load. If so, return the maps to the queue
+                    if room.config().selection != selection {
+                        self.maps.extend_maps(selection, maps);
+                        return;
+                    }
+
+                    room.add_maps(maps);
+                    self.channels.broadcast(
+                        room.channel(),
+                        ServerEventVariant::MapsLoadResult { loaded: true },
+                    )
+                }
+                None => self.channels.broadcast(
+                    room.channel(),
+                    ServerEventVariant::MapsLoadResult { loaded: false },
+                ),
+            }
+        }
+    }
+
+    pub fn edit_room_config(self: &Arc<Self>, room_id: RoomIdentifier, config: RoomConfiguration) {
+        // TODO: handle errors
+        if let Some(room) = self.rooms.lock().expect("lock poisoned").get_mut(room_id) {
+            let old_grid_size = room.config().grid_size;
+            let old_selection = room.config().selection;
             room.set_config(config.clone());
+
+            // Fetch / Remove maps if selection or grid size change
+            if config.selection != old_selection {
+                self.maps.extend_maps(old_selection, room.remove_all_maps());
+                tokio::spawn(self.clone().load_maps(
+                    room_id,
+                    config.selection,
+                    (config.grid_size * config.grid_size) as usize,
+                ));
+            } else {
+                let map_diff = usize::abs_diff(
+                    config.grid_size as usize * config.grid_size as usize,
+                    old_grid_size as usize * old_grid_size as usize,
+                );
+                if config.grid_size > old_grid_size {
+                    tokio::spawn(self.clone().load_maps(room_id, config.selection, map_diff));
+                } else if config.grid_size < old_grid_size {
+                    self.maps
+                        .extend_maps(old_selection, room.remove_maps(map_diff));
+                }
+            }
+
             self.channels
                 .broadcast(room.channel(), ServerEventVariant::RoomConfigUpdate(config));
+        }
+    }
+
+    pub fn add_team(&self, room: RoomIdentifier) {
+        if let Some(room) = self.rooms.lock().expect("lock poisoned").get_mut(room) {
+            room.create_team(self.channels.create_one());
+            self.channels.broadcast(
+                room.channel(),
+                ServerEventVariant::RoomUpdate(room.status()),
+            );
         }
     }
 

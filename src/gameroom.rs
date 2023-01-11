@@ -8,6 +8,7 @@ use crate::{
     channel::ChannelAddress,
     client::GameClient,
     config::TEAMS,
+    gamemap::GameMap,
     gameteam::{GameTeam, TeamIdentifier},
     rest::auth::PlayerIdentity,
 };
@@ -23,6 +24,7 @@ pub struct GameRoom {
     members: Arena<PlayerData>,
     teams: Vec<GameTeam>,
     channel: ChannelAddress,
+    maps: Vec<GameMap>,
 }
 
 impl GameRoom {
@@ -39,6 +41,7 @@ impl GameRoom {
             members: Arena::new(),
             teams: Vec::new(),
             channel,
+            maps: Vec::new(),
         }
     }
 
@@ -56,6 +59,22 @@ impl GameRoom {
 
     pub fn channel(&self) -> ChannelAddress {
         self.channel.clone()
+    }
+
+    pub fn maps(&self) -> &Vec<GameMap> {
+        &self.maps
+    }
+
+    pub fn add_maps(&mut self, maps: Vec<GameMap>) {
+        self.maps.extend(maps);
+    }
+
+    pub fn remove_maps(&mut self, count: usize) -> Vec<GameMap> {
+        self.maps.split_off(self.maps.len() - count)
+    }
+
+    pub fn remove_all_maps(&mut self) -> Vec<GameMap> {
+        self.remove_maps(self.maps.len())
     }
 
     pub fn players(&self) -> Vec<NetworkPlayer> {
@@ -204,7 +223,7 @@ pub struct RoomConfiguration {
     pub mappack_id: Option<String>,
 }
 
-#[derive(Clone, Copy, Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Clone, Copy, Debug, Serialize_repr, Deserialize_repr, PartialEq, Eq)]
 #[repr(u32)]
 pub enum MapMode {
     TOTD,
@@ -212,7 +231,7 @@ pub enum MapMode {
     Mappack,
 }
 
-#[derive(Clone, Copy, Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Clone, Copy, Debug, Serialize_repr, Deserialize_repr, PartialEq, Eq)]
 #[repr(u32)]
 pub enum Medal {
     Author,

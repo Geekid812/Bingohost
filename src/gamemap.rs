@@ -9,6 +9,7 @@ use reqwest::{
 };
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time::sleep;
+use tracing::{info, warn};
 
 use crate::{
     config,
@@ -58,6 +59,22 @@ impl MapStock {
         loop {
             match rx.recv().await {
                 Some((mode, count)) => {
+                    let queue_full = match mode {
+                        MapMode::TOTD => {
+                            self.totd.lock().expect("lock poisoned").size()
+                                >= config::MAP_QUEUE_CAPACITY
+                        }
+                        MapMode::RandomTMX => {
+                            self.random_tmx.lock().expect("lock poisoned").size()
+                                >= config::MAP_QUEUE_CAPACITY
+                        }
+                        MapMode::Mappack => false,
+                    };
+                    if queue_full {
+                        warn!("map queue for {:?} is full, doing nothing", mode);
+                        continue;
+                    }
+                    info!("loading {} maps for mode {:?}", count, mode);
                     let (result, queue) = match mode {
                         MapMode::TOTD => (get_totd(&self.client, count).await, &self.totd),
                         MapMode::RandomTMX => {
@@ -83,29 +100,40 @@ impl MapStock {
     }
 
     pub async fn get_maps(&self, mode: MapMode, count: usize) -> MapResult {
-        let result = match mode {
+        self.notifier
+            .send((mode, count))
+            .expect("MapStock notifier failed");
+
+        match mode {
             MapMode::TOTD => Self::get_from_queue(&self.totd, count).await,
             MapMode::RandomTMX => Self::get_from_queue(&self.random_tmx, count).await,
             MapMode::Mappack => None, // TODO
-        };
-
-        if result.is_some() {
-            self.notifier
-                .send((mode, count))
-                .expect("MapStock notifier failed");
         }
-        result
+    }
+
+    pub fn extend_maps(&self, mode: MapMode, maps: Vec<GameMap>) {
+        info!("Replacing {} maps for mode {:?}", maps.len(), mode);
+        match mode {
+            MapMode::TOTD => Self::extend_queue(&self.totd, maps),
+            MapMode::RandomTMX => Self::extend_queue(&self.random_tmx, maps),
+            MapMode::Mappack => (),
+        }
+    }
+
+    fn extend_queue(queue: &Mutex<MapQueue>, maps: Vec<GameMap>) {
+        queue.lock().expect("lock poisioned").extend(maps)
     }
 
     async fn get_from_queue(queue: &Mutex<MapQueue>, count: usize) -> MapResult {
         let timeout = Instant::now() + config::TMX_FETCH_TIMEOUT;
         loop {
-            let mut lock = queue.lock().ok()?;
-            let result = lock.get(count);
-            if result.is_some() {
-                return result;
+            {
+                let mut lock = queue.lock().ok()?;
+                let result = lock.get(count);
+                if result.is_some() {
+                    return result;
+                }
             }
-            drop(lock);
             if Instant::now() > timeout {
                 return None;
             }
@@ -135,6 +163,10 @@ impl MapQueue {
 
     pub fn extend(&mut self, maps: Vec<GameMap>) {
         self.stock.extend(maps)
+    }
+
+    pub fn size(&self) -> usize {
+        self.stock.len()
     }
 }
 
