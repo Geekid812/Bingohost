@@ -110,6 +110,15 @@ impl GameClient {
                     error: "You are not in a room.".to_owned(),
                 }
             }
+            RequestVariant::CreateTeam => {
+                if let Some((room, _)) = self.player_id {
+                    self.server.add_team(room);
+                    return ResponseVariant::Ok;
+                }
+                ResponseVariant::Error {
+                    error: "You are not in a room.".to_owned(),
+                }
+            }
         }
     }
 

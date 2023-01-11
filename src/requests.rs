@@ -55,6 +55,7 @@ pub enum RequestVariant {
     CreateRoom(CreateRoomRequest),
     JoinRoom { join_code: String },
     EditRoomConfig { config: RoomConfiguration },
+    CreateTeam,
 }
 
 #[derive(Serialize)]
