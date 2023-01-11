@@ -147,6 +147,11 @@ impl GameServer {
                 for team in &room.teams() {
                     self.channels.remove(team.channel_id);
                 }
+            } else {
+                self.channels.broadcast(
+                    room.channel(),
+                    ServerEventVariant::RoomUpdate(room.status()),
+                );
             }
         }
     }
