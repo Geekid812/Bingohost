@@ -147,6 +147,10 @@ impl GameRoom {
             data.team = Some(team);
         }
     }
+
+    pub fn set_config(&mut self, config: RoomConfiguration) {
+        self.config = config
+    }
 }
 
 #[derive(Serialize)]

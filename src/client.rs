@@ -103,6 +103,15 @@ impl GameClient {
                     },
                 }
             }
+            RequestVariant::EditRoomConfig { config } => {
+                if let Some((room, _)) = self.player_id {
+                    self.server.edit_room_config(room, config.clone());
+                    return ResponseVariant::Ok;
+                }
+                ResponseVariant::Error {
+                    error: "You are not in a room.".to_owned(),
+                }
+            }
         }
     }
 

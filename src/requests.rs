@@ -54,19 +54,21 @@ pub struct BaseResponse {
 pub enum RequestVariant {
     CreateRoom(CreateRoomRequest),
     JoinRoom { join_code: String },
+    EditRoomConfig { config: RoomConfiguration },
 }
 
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum ResponseVariant {
+    Ok,
+    Error {
+        error: String,
+    },
     CreateRoom(CreateRoomResponse),
     JoinRoom {
         name: String,
         config: RoomConfiguration,
         status: RoomStatus,
-    },
-    Error {
-        error: String,
     },
 }
 

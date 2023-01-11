@@ -79,6 +79,15 @@ impl GameServer {
         ((room_id, player_id), room_name, code, vec![team1, team2])
     }
 
+    pub fn edit_room_config(&self, room: RoomIdentifier, config: RoomConfiguration) {
+        // TODO: handle errors
+        if let Some(room) = self.rooms.lock().expect("lock poisoned").get_mut(room) {
+            room.set_config(config.clone());
+            self.channels
+                .broadcast(room.channel(), ServerEventVariant::RoomConfigUpdate(config));
+        }
+    }
+
     pub fn change_team(&self, (room, player): PlayerRef, team: TeamIdentifier) {
         if let Some(room) = self.rooms.lock().expect("lock poisoned").get_mut(room) {
             room.change_team(player, team);
