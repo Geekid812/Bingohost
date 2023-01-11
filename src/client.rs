@@ -47,12 +47,10 @@ impl GameClient {
                     if let Ok(request) = serde_json::from_str::<BaseRequest>(&text) {
                         let res = self.handle_request(&request.variant).await;
                         let response = request.reply(res);
-                        let sent = self
-                            .protocol
-                            .send(
-                                &serde_json::to_string(&response).expect("response serialization"),
-                            )
-                            .await;
+                        let res_text =
+                            serde_json::to_string(&response).expect("response serialization");
+                        info!("Response: {}", &res_text);
+                        let sent = self.protocol.send(&res_text).await;
                         if let Err(e) = sent {
                             self.protocol.error(&e.to_string()).await;
                             return;
