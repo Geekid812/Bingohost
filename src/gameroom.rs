@@ -8,6 +8,7 @@ use crate::{
     channel::ChannelAddress,
     client::GameClient,
     config::TEAMS,
+    gamedata::ActiveGameData,
     gamemap::GameMap,
     gameteam::{GameTeam, TeamIdentifier},
     rest::auth::PlayerIdentity,
@@ -25,6 +26,7 @@ pub struct GameRoom {
     teams: Vec<GameTeam>,
     channel: ChannelAddress,
     maps: Vec<GameMap>,
+    active: Option<ActiveGameData>,
 }
 
 impl GameRoom {
@@ -42,6 +44,7 @@ impl GameRoom {
             teams: Vec::new(),
             channel,
             maps: Vec::new(),
+            active: None,
         }
     }
 
@@ -63,6 +66,10 @@ impl GameRoom {
 
     pub fn maps(&self) -> &Vec<GameMap> {
         &self.maps
+    }
+
+    pub fn has_started(&self) -> bool {
+        self.active.is_some()
     }
 
     pub fn add_maps(&mut self, maps: Vec<GameMap>) {
@@ -146,7 +153,9 @@ impl GameRoom {
         client: &GameClient,
         operator: bool,
     ) -> Result<PlayerIdentifier, JoinRoomError> {
-        // TODO: check that it has started
+        if self.has_started() {
+            return Err(JoinRoomError::HasStarted);
+        }
         if self.config.size != 0 && self.members.len() as u32 >= self.config.size {
             return Err(JoinRoomError::PlayerLimitReached);
         }
@@ -169,6 +178,14 @@ impl GameRoom {
 
     pub fn set_config(&mut self, config: RoomConfiguration) {
         self.config = config
+    }
+
+    pub fn set_started(&mut self, started: bool) {
+        if started {
+            self.active = Some(ActiveGameData::new(self.maps.len()));
+        } else {
+            self.active = None;
+        }
     }
 }
 

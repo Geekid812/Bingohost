@@ -7,6 +7,7 @@ use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client,
 };
+use serde::Serialize;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time::sleep;
 use tracing::{info, warn};
@@ -170,8 +171,9 @@ impl MapQueue {
     }
 }
 
+#[derive(Serialize, Clone, Debug)]
 pub struct GameMap {
     pub track_id: i64,
     pub name: String,
-    pub username: String,
+    pub author_name: String,
 }

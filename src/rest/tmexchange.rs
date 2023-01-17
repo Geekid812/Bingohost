@@ -70,7 +70,7 @@ impl Into<GameMap> for TMExchangeMap {
         GameMap {
             track_id: self.track_id,
             name: self.name,
-            username: self.username,
+            author_name: self.username,
         }
     }
 }

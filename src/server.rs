@@ -232,4 +232,18 @@ impl GameServer {
             }
         }
     }
+
+    pub fn start_game(&self, (room_id, _player): PlayerRef) {
+        let mut lock = self.rooms.lock().expect("lock poisoned");
+        if let Some(room) = lock.get_mut(room_id) {
+            // TODO: check is operator
+            room.set_started(true);
+            self.channels.broadcast(
+                room.channel(),
+                ServerEventVariant::GameStart {
+                    maps: room.maps().clone(),
+                },
+            );
+        }
+    }
 }

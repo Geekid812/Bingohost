@@ -1,4 +1,7 @@
-use crate::gameroom::{RoomConfiguration, RoomStatus};
+use crate::{
+    gamemap::GameMap,
+    gameroom::{RoomConfiguration, RoomStatus},
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -14,4 +17,5 @@ pub enum ServerEventVariant {
     RoomUpdate(RoomStatus),
     RoomConfigUpdate(RoomConfiguration),
     MapsLoadResult { loaded: bool },
+    GameStart { maps: Vec<GameMap> },
 }

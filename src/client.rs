@@ -120,6 +120,11 @@ impl GameClient {
                     error: "You are not in a room.".to_owned(),
                 }
             }
+            RequestVariant::StartGame => {
+                self.server
+                    .start_game(self.player_id.expect("client is in a room"));
+                ResponseVariant::Ok
+            }
         }
     }
 

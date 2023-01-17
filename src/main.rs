@@ -14,6 +14,7 @@ pub mod channel;
 pub mod client;
 pub mod config;
 pub mod events;
+pub mod gamedata;
 pub mod gamemap;
 pub mod gameroom;
 pub mod gameteam;
