@@ -61,6 +61,8 @@ async fn get_maps(
 struct TMExchangeMap {
     #[serde(rename = "TrackID")]
     track_id: i64,
+    #[serde(rename = "TrackUID")]
+    track_uid: String,
     name: String,
     username: String,
 }
@@ -69,6 +71,7 @@ impl Into<GameMap> for TMExchangeMap {
     fn into(self) -> GameMap {
         GameMap {
             track_id: self.track_id,
+            uid: self.track_uid,
             name: self.name,
             author_name: self.username,
         }
