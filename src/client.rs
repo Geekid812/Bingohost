@@ -75,6 +75,7 @@ impl GameClient {
 
     async fn handle_request(&mut self, variant: &RequestVariant) -> ResponseVariant {
         match variant {
+            RequestVariant::Ping => ResponseVariant::Pong,
             RequestVariant::CreateRoom(req) => {
                 let (player, name, join_code, teams) =
                     self.server.create_new_room(req.config.clone(), &self);

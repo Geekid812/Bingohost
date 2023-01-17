@@ -52,6 +52,7 @@ pub struct BaseResponse {
 #[derive(Deserialize)]
 #[serde(tag = "request")]
 pub enum RequestVariant {
+    Ping,
     CreateRoom(CreateRoomRequest),
     JoinRoom { join_code: String },
     EditRoomConfig { config: RoomConfiguration },
@@ -61,6 +62,7 @@ pub enum RequestVariant {
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum ResponseVariant {
+    Pong,
     Ok,
     Error {
         error: String,
