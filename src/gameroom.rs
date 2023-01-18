@@ -8,7 +8,7 @@ use crate::{
     channel::ChannelAddress,
     client::GameClient,
     config::TEAMS,
-    gamedata::ActiveGameData,
+    gamedata::{ActiveGameData, MapCell},
     gamemap::GameMap,
     gameteam::{GameTeam, TeamIdentifier},
     rest::auth::PlayerIdentity,
@@ -191,6 +191,20 @@ impl GameRoom {
             self.active = None;
         }
     }
+
+    pub fn get_cell_record(&mut self, cell_id: usize) -> Option<&mut MapCell> {
+        self.active
+            .as_mut()
+            .and_then(|state| state.cells.get_mut(cell_id))
+    }
+
+    pub fn get_map(&self, uid: String) -> Option<(usize, &GameMap)> {
+        self.maps
+            .iter()
+            .enumerate()
+            .filter(|m| m.1.uid == uid)
+            .next()
+    }
 }
 
 #[derive(Serialize)]
@@ -216,7 +230,7 @@ pub struct PlayerData {
     pub disconnected: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct NetworkPlayer {
     pub name: String,
     pub team: Option<TeamIdentifier>,

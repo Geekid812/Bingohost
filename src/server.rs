@@ -9,9 +9,11 @@ use crate::{
     client::{ClientId, GameClient},
     config::{self, JOINCODE_CHARS, JOINCODE_LENGTH},
     events::ServerEventVariant,
+    gamedata::MapClaim,
     gamemap::{MapStock, Receiver, Sender},
     gameroom::{
-        GameRoom, JoinRoomError, MapMode, PlayerRef, RoomConfiguration, RoomIdentifier, RoomStatus,
+        GameRoom, JoinRoomError, MapMode, Medal, NetworkPlayer, PlayerRef, RoomConfiguration,
+        RoomIdentifier, RoomStatus,
     },
     gameteam::{GameTeam, TeamIdentifier},
 };
@@ -244,6 +246,43 @@ impl GameServer {
                     maps: room.maps().clone(),
                 },
             );
+        }
+    }
+
+    pub fn claim_cell(
+        &self,
+        (room_id, player_id): PlayerRef,
+        map_uid: String,
+        time: u64,
+        medal: Medal,
+    ) {
+        let mut lock = self.rooms.lock().expect("lock poisoned");
+        if let Some(room) = lock.get_mut(room_id) {
+            if let Some(player) = room.get_player(player_id) {
+                let claim = MapClaim {
+                    player: NetworkPlayer::from(player),
+                    time,
+                    medal,
+                };
+
+                let cell_id = room.get_map(map_uid).unwrap().0; // TODO: avoid unwrap
+                let cell = room
+                    .get_cell_record(cell_id)
+                    .expect("cells are correctly initialized");
+
+                // unwrap here is safe because we check for none previously
+                if cell.claim.is_none() || claim.time < cell.claim.as_ref().unwrap().time {
+                    cell.claim = Some(claim.clone());
+
+                    self.channels.broadcast(
+                        room.channel(),
+                        ServerEventVariant::CellClaim {
+                            cell_id: cell_id,
+                            claim: claim,
+                        },
+                    )
+                }
+            }
         }
     }
 }

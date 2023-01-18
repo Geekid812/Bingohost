@@ -1,4 +1,5 @@
 use crate::{
+    gamedata::MapClaim,
     gamemap::GameMap,
     gameroom::{RoomConfiguration, RoomStatus},
 };
@@ -18,4 +19,5 @@ pub enum ServerEventVariant {
     RoomConfigUpdate(RoomConfiguration),
     MapsLoadResult { loaded: bool },
     GameStart { maps: Vec<GameMap> },
+    CellClaim { cell_id: usize, claim: MapClaim },
 }

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    gameroom::{RoomConfiguration, RoomStatus},
+    gameroom::{Medal, RoomConfiguration, RoomStatus},
     gameteam::GameTeam,
 };
 
@@ -54,10 +54,19 @@ pub struct BaseResponse {
 pub enum RequestVariant {
     Ping,
     CreateRoom(CreateRoomRequest),
-    JoinRoom { join_code: String },
-    EditRoomConfig { config: RoomConfiguration },
+    JoinRoom {
+        join_code: String,
+    },
+    EditRoomConfig {
+        config: RoomConfiguration,
+    },
     CreateTeam,
     StartGame,
+    ClaimCell {
+        uid: String,
+        time: u64,
+        medal: Medal,
+    },
 }
 
 #[derive(Serialize)]

@@ -6,8 +6,8 @@ use crate::gameroom::{Medal, NetworkPlayer};
 
 #[derive(Serialize)]
 pub struct ActiveGameData {
-    start_time: SystemTime,
-    cells: Vec<MapCell>,
+    pub start_time: SystemTime,
+    pub cells: Vec<MapCell>,
 }
 
 impl ActiveGameData {
@@ -28,9 +28,9 @@ pub struct MapCell {
     pub claim: Option<MapClaim>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct MapClaim {
-    player: NetworkPlayer,
-    time: u64,
-    medal: Medal,
+    pub player: NetworkPlayer,
+    pub time: u64,
+    pub medal: Medal,
 }

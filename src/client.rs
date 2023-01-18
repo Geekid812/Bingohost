@@ -125,6 +125,15 @@ impl GameClient {
                     .start_game(self.player_id.expect("client is in a room"));
                 ResponseVariant::Ok
             }
+            RequestVariant::ClaimCell { uid, time, medal } => {
+                if let Some(player) = self.player_id {
+                    self.server.claim_cell(player, uid.clone(), *time, *medal);
+                    return ResponseVariant::Ok;
+                }
+                ResponseVariant::Error {
+                    error: "You are not in a room.".to_owned(),
+                }
+            }
         }
     }
 
