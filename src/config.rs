@@ -3,14 +3,37 @@ use std::time::Duration;
 use crate::util::version::Version;
 use tracing::Level;
 
-pub const LOG_LEVEL: Level = Level::INFO;
-pub const TCP_LISTENING_PORT: u16 = 6600;
-pub const MINIMUM_CLIENT_VERSION: Version = Version(3, 0);
-pub const AUTHENTICATION_API_SECRET: &'static str = env!("AUTH_SECRET");
+#[cfg(not(feature = "preview"))]
+mod default {
+    use super::*;
 
-pub const MAP_QUEUE_SIZE: usize = 10;
-pub const MAP_QUEUE_CAPACITY: usize = 30;
-pub const TMX_FETCH_TIMEOUT: Duration = Duration::from_secs(20);
+    pub const LOG_LEVEL: Level = Level::INFO;
+    pub const TCP_LISTENING_PORT: u16 = 6600;
+    pub const MINIMUM_CLIENT_VERSION: Version = Version(3, 0);
+
+    pub const MAP_QUEUE_SIZE: usize = 10;
+    pub const MAP_QUEUE_CAPACITY: usize = 30;
+    pub const TMX_FETCH_TIMEOUT: Duration = Duration::from_secs(20);
+}
+#[cfg(not(feature = "preview"))]
+pub use default::*;
+
+#[cfg(feature = "preview")]
+mod preview {
+    use super::*;
+
+    pub const LOG_LEVEL: Level = Level::INFO;
+    pub const TCP_LISTENING_PORT: u16 = 6699;
+    pub const MINIMUM_CLIENT_VERSION: Version = Version(3, 0);
+
+    pub const MAP_QUEUE_SIZE: usize = 100;
+    pub const MAP_QUEUE_CAPACITY: usize = 200;
+    pub const TMX_FETCH_TIMEOUT: Duration = Duration::from_secs(20);
+}
+#[cfg(feature = "preview")]
+pub use preview::*;
+
+pub const AUTHENTICATION_API_SECRET: &'static str = env!("AUTH_SECRET");
 pub const TMX_USERAGENT: &'static str = env!("TMX_USERAGENT");
 
 pub const TEAMS: [(&'static str, &'static str); 6] = [

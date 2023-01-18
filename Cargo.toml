@@ -21,3 +21,6 @@ tokio = { version = "1.23.0", features = ["full"] }
 # Depend on a patched tokio runtime to fix inconvenient trait implementations
 [patch.crates-io]
 tokio = { git = "https://github.com/Geekid812/tokio", branch = "tokio-1.23.x"}
+
+[features]
+preview = []
