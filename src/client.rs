@@ -134,6 +134,15 @@ impl GameClient {
                     error: "You are not in a room.".to_owned(),
                 }
             }
+            RequestVariant::Sync => {
+                match self.server.sync_client(self.player_id.unwrap()) {
+                    // TODO don't unwrap
+                    Some(sync) => ResponseVariant::Sync(sync),
+                    None => ResponseVariant::Error {
+                        error: "Sync error".to_string(),
+                    }, // TODO: handle results
+                }
+            }
         }
     }
 

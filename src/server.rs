@@ -16,6 +16,7 @@ use crate::{
         RoomIdentifier, RoomStatus,
     },
     gameteam::{GameTeam, TeamIdentifier},
+    sync::{build_sync_packet, SyncPacket},
 };
 
 pub struct GameServer {
@@ -284,5 +285,13 @@ impl GameServer {
                 }
             }
         }
+    }
+
+    pub fn sync_client(&self, (room_id, player_id): PlayerRef) -> Option<SyncPacket> {
+        self.rooms
+            .lock()
+            .expect("lock poisoned")
+            .get_mut(room_id)
+            .and_then(|room| build_sync_packet(room, player_id))
     }
 }

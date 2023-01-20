@@ -68,6 +68,10 @@ impl GameRoom {
         &self.maps
     }
 
+    pub fn game_data(&self) -> &Option<ActiveGameData> {
+        &self.active
+    }
+
     pub fn has_started(&self) -> bool {
         self.active.is_some()
     }

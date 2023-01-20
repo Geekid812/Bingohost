@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     gameroom::{Medal, RoomConfiguration, RoomStatus},
     gameteam::GameTeam,
+    sync::SyncPacket,
 };
 
 #[macro_use]
@@ -67,6 +68,7 @@ pub enum RequestVariant {
         time: u64,
         medal: Medal,
     },
+    Sync,
 }
 
 #[derive(Serialize)]
@@ -83,6 +85,7 @@ pub enum ResponseVariant {
         config: RoomConfiguration,
         status: RoomStatus,
     },
+    Sync(SyncPacket),
 }
 
 #[derive(Deserialize)]

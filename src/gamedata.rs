@@ -1,12 +1,13 @@
-use std::time::SystemTime;
+use std::time::Instant;
 
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 use crate::gameroom::{Medal, NetworkPlayer};
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct ActiveGameData {
-    pub start_time: SystemTime,
+    #[serde(serialize_with = "serialize_time")]
+    pub start_time: Instant,
     pub cells: Vec<MapCell>,
 }
 
@@ -17,13 +18,17 @@ impl ActiveGameData {
             cells.push(MapCell { claim: None });
         }
         Self {
-            start_time: SystemTime::now(),
+            start_time: Instant::now(),
             cells,
         }
     }
 }
 
-#[derive(Serialize)]
+fn serialize_time<S: Serializer>(time: &Instant, serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_u128(time.elapsed().as_millis())
+}
+
+#[derive(Serialize, Clone)]
 pub struct MapCell {
     pub claim: Option<MapClaim>,
 }

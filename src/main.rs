@@ -22,6 +22,7 @@ pub mod protocol;
 pub mod requests;
 pub mod rest;
 pub mod server;
+pub mod sync;
 pub mod util;
 
 pub type GlobalServer = Arc<GameServer>;
