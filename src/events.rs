@@ -7,14 +7,14 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 #[serde(tag = "event")]
-pub enum ClientEventVariant {
+pub enum ClientEvent {
     ChangeTeam { team_id: usize },
     LeaveRoom,
 }
 
 #[derive(Serialize)]
 #[serde(tag = "event")]
-pub enum ServerEventVariant {
+pub enum ServerEvent {
     RoomUpdate(RoomStatus),
     RoomConfigUpdate(RoomConfiguration),
     MapsLoadResult { loaded: bool },

@@ -8,7 +8,7 @@ use tracing::info;
 
 use crate::{
     client::{ClientId, GameClient},
-    events::ServerEventVariant,
+    events::ServerEvent,
     protocol::Protocol,
 };
 
@@ -85,7 +85,7 @@ impl ChannelCollection {
         }
     }
 
-    pub fn broadcast(&self, address: ChannelAddress, event: ServerEventVariant) {
+    pub fn broadcast(&self, address: ChannelAddress, event: ServerEvent) {
         let message = serde_json::to_string(&event).expect("event serialization");
         self.arena
             .read()

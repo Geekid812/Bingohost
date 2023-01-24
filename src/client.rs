@@ -4,10 +4,10 @@ use std::sync::Arc;
 use tracing::info;
 
 use crate::config::TEAMS;
-use crate::events::{ClientEventVariant, ServerEventVariant};
+use crate::events::{ClientEvent, ServerEvent};
 use crate::gameroom::PlayerRef;
 use crate::protocol::Protocol;
-use crate::requests::{BaseRequest, CreateRoomResponse, RequestVariant, ResponseVariant};
+use crate::requests::{BaseRequest, CreateRoomResponse, Request, Response};
 use crate::rest::auth::PlayerIdentity;
 use crate::GlobalServer;
 
@@ -57,7 +57,7 @@ impl GameClient {
                         }
                     } else {
                         // Match an event
-                        match serde_json::from_str::<ClientEventVariant>(&text) {
+                        match serde_json::from_str::<ClientEvent>(&text) {
                             Ok(event) => self.handle_event(&event).await,
                             Err(e) => self.protocol.error(&e.to_string()).await,
                         };
@@ -73,72 +73,70 @@ impl GameClient {
         }
     }
 
-    async fn handle_request(&mut self, variant: &RequestVariant) -> ResponseVariant {
+    async fn handle_request(&mut self, variant: &Request) -> Response {
         match variant {
-            RequestVariant::Ping => ResponseVariant::Pong,
-            RequestVariant::CreateRoom(req) => {
+            Request::Ping => Response::Pong,
+            Request::CreateRoom(req) => {
                 let (player, name, join_code, teams) =
                     self.server.create_new_room(req.config.clone(), &self);
                 self.player_id = Some(player);
-                ResponseVariant::CreateRoom(CreateRoomResponse {
+                Response::CreateRoom(CreateRoomResponse {
                     name,
                     join_code,
                     teams,
                     max_teams: TEAMS.len(),
                 })
             }
-            RequestVariant::JoinRoom { join_code } => {
-                match self.server.join_room(&self, join_code) {
-                    Ok((player, name, config, status)) => {
-                        self.player_id = Some(player);
-                        ResponseVariant::JoinRoom {
-                            name,
-                            config: config,
-                            status: status,
-                        }
+            Request::JoinRoom { join_code } => match self.server.join_room(&self, join_code) {
+                Ok((player, name, config, status)) => {
+                    self.player_id = Some(player);
+                    Response::JoinRoom {
+                        name,
+                        config: config,
+                        status: status,
                     }
-                    Err(e) => ResponseVariant::Error {
-                        error: e.to_string(),
-                    },
                 }
-            }
-            RequestVariant::EditRoomConfig { config } => {
+                Err(e) => Response::Error {
+                    error: e.to_string(),
+                },
+            },
+            Request::EditRoomConfig { config } => {
                 if let Some((room, _)) = self.player_id {
                     self.server.edit_room_config(room, config.clone());
-                    return ResponseVariant::Ok;
+                    return Response::Ok;
                 }
-                ResponseVariant::Error {
+                Response::Error {
                     error: "You are not in a room.".to_owned(),
                 }
             }
-            RequestVariant::CreateTeam => {
+            Request::CreateTeam => {
                 if let Some((room, _)) = self.player_id {
                     self.server.add_team(room);
-                    return ResponseVariant::Ok;
+                    return Response::Ok;
                 }
-                ResponseVariant::Error {
+                Response::Error {
                     error: "You are not in a room.".to_owned(),
                 }
             }
-            RequestVariant::StartGame => {
+            Request::StartGame => {
                 self.server
                     .start_game(self.player_id.expect("client is in a room"));
-                ResponseVariant::Ok
+                Response::Ok
             }
-            RequestVariant::ClaimCell { uid, time, medal } => {
+            Request::ClaimCell { uid, time, medal } => {
                 if let Some(player) = self.player_id {
                     self.server.claim_cell(player, uid.clone(), *time, *medal);
-                    return ResponseVariant::Ok;
+                    return Response::Ok;
                 }
-                ResponseVariant::Error {
+                Response::Error {
                     error: "You are not in a room.".to_owned(),
                 }
             }
-            RequestVariant::Sync => {
+            Request::Sync => {
                 match self.server.sync_client(self.player_id.unwrap()) {
                     // TODO don't unwrap
-                    Some(sync) => ResponseVariant::Sync(sync),
-                    None => ResponseVariant::Error {
+                    Some(sync) => Response::Sync(sync),
+                    None => Response::Error {
                         error: "Sync error".to_string(),
                     }, // TODO: handle results
                 }
@@ -146,14 +144,14 @@ impl GameClient {
         }
     }
 
-    async fn handle_event(&mut self, variant: &ClientEventVariant) {
+    async fn handle_event(&mut self, variant: &ClientEvent) {
         match variant {
-            ClientEventVariant::ChangeTeam { team_id } => {
+            ClientEvent::ChangeTeam { team_id } => {
                 if let Some(player) = self.player_id {
                     self.server.change_team(player.clone(), *team_id);
                 }
             }
-            ClientEventVariant::LeaveRoom => {
+            ClientEvent::LeaveRoom => {
                 if let Some(player) = self.player_id {
                     self.server.leave(self.id, player);
                 }
@@ -169,7 +167,7 @@ impl GameClient {
         }
     }
 
-    async fn fire_event(&mut self, event: ServerEventVariant) {
+    async fn fire_event(&mut self, event: ServerEvent) {
         let sent = self
             .protocol
             .send(&serde_json::to_string(&event).expect("event serialization"))

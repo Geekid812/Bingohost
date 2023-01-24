@@ -8,7 +8,7 @@ use crate::{
     channel::ChannelCollection,
     client::{ClientId, GameClient},
     config::{self, JOINCODE_CHARS, JOINCODE_LENGTH},
-    events::ServerEventVariant,
+    events::ServerEvent,
     gamedata::MapClaim,
     gamemap::{MapStock, Receiver, Sender},
     gameroom::{
@@ -103,14 +103,12 @@ impl GameServer {
                     }
 
                     room.add_maps(maps);
-                    self.channels.broadcast(
-                        room.channel(),
-                        ServerEventVariant::MapsLoadResult { loaded: true },
-                    )
+                    self.channels
+                        .broadcast(room.channel(), ServerEvent::MapsLoadResult { loaded: true })
                 }
                 None => self.channels.broadcast(
                     room.channel(),
-                    ServerEventVariant::MapsLoadResult { loaded: false },
+                    ServerEvent::MapsLoadResult { loaded: false },
                 ),
             }
         }
@@ -145,27 +143,23 @@ impl GameServer {
             }
 
             self.channels
-                .broadcast(room.channel(), ServerEventVariant::RoomConfigUpdate(config));
+                .broadcast(room.channel(), ServerEvent::RoomConfigUpdate(config));
         }
     }
 
     pub fn add_team(&self, room: RoomIdentifier) {
         if let Some(room) = self.rooms.lock().expect("lock poisoned").get_mut(room) {
             room.create_team(self.channels.create_one());
-            self.channels.broadcast(
-                room.channel(),
-                ServerEventVariant::RoomUpdate(room.status()),
-            );
+            self.channels
+                .broadcast(room.channel(), ServerEvent::RoomUpdate(room.status()));
         }
     }
 
     pub fn change_team(&self, (room, player): PlayerRef, team: TeamIdentifier) {
         if let Some(room) = self.rooms.lock().expect("lock poisoned").get_mut(room) {
             room.change_team(player, team);
-            self.channels.broadcast(
-                room.channel(),
-                ServerEventVariant::RoomUpdate(room.status()),
-            );
+            self.channels
+                .broadcast(room.channel(), ServerEvent::RoomUpdate(room.status()));
         }
     }
 
@@ -193,7 +187,7 @@ impl GameServer {
         let player_id = room.player_join(client, false)?;
         let channel = room.channel();
         self.channels
-            .broadcast(channel, ServerEventVariant::RoomUpdate(room.status()));
+            .broadcast(channel, ServerEvent::RoomUpdate(room.status()));
         self.channels.subscribe(channel, client);
         Ok((
             (room_id, player_id),
@@ -228,10 +222,8 @@ impl GameServer {
                     self.channels.remove(team.channel_id);
                 }
             } else {
-                self.channels.broadcast(
-                    room.channel(),
-                    ServerEventVariant::RoomUpdate(room.status()),
-                );
+                self.channels
+                    .broadcast(room.channel(), ServerEvent::RoomUpdate(room.status()));
             }
         }
     }
@@ -243,7 +235,7 @@ impl GameServer {
             room.set_started(true);
             self.channels.broadcast(
                 room.channel(),
-                ServerEventVariant::GameStart {
+                ServerEvent::GameStart {
                     maps: room.maps().clone(),
                 },
             );
@@ -277,7 +269,7 @@ impl GameServer {
 
                     self.channels.broadcast(
                         room.channel(),
-                        ServerEventVariant::CellClaim {
+                        ServerEvent::CellClaim {
                             cell_id: cell_id,
                             claim: claim,
                         },

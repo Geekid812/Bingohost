@@ -6,35 +6,16 @@ use crate::{
     sync::SyncPacket,
 };
 
-#[macro_use]
-mod macros {
-    macro_rules! impl_request {
-        ($req:ident, $res:ident) => {
-            impl Request for $req {
-                type Response = $res;
-            }
-
-            impl Response for $res {}
-        };
-    }
-}
-
-pub trait Request {
-    type Response: Response;
-}
-
-pub trait Response: Serialize {}
-
 #[derive(Deserialize)]
 pub struct BaseRequest {
     #[serde(rename = "seq")]
     sequence: u32,
     #[serde(flatten)]
-    pub variant: RequestVariant,
+    pub variant: Request,
 }
 
 impl BaseRequest {
-    pub fn reply(&self, response: ResponseVariant) -> BaseResponse {
+    pub fn reply(&self, response: Response) -> BaseResponse {
         BaseResponse {
             sequence: self.sequence,
             data: response,
@@ -47,12 +28,12 @@ pub struct BaseResponse {
     #[serde(rename = "seq")]
     sequence: u32,
     #[serde(flatten)]
-    data: ResponseVariant,
+    data: Response,
 }
 
 #[derive(Deserialize)]
 #[serde(tag = "request")]
-pub enum RequestVariant {
+pub enum Request {
     Ping,
     CreateRoom(CreateRoomRequest),
     JoinRoom {
@@ -73,7 +54,7 @@ pub enum RequestVariant {
 
 #[derive(Serialize)]
 #[serde(untagged)]
-pub enum ResponseVariant {
+pub enum Response {
     Pong,
     Ok,
     Error {
@@ -101,5 +82,3 @@ pub struct CreateRoomResponse {
     pub max_teams: usize,
     pub teams: Vec<GameTeam>,
 }
-
-impl_request!(CreateRoomRequest, CreateRoomResponse);
