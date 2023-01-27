@@ -137,7 +137,7 @@ impl GameClient {
                 }
             }
             Request::Sync => {
-                if (self.player_id.is_none()) {
+                if self.player_id.is_none() {
                     return Response::Error {
                         error: "Sync failed, the game you joined may have ended already."
                             .to_string(),

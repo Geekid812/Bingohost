@@ -1,5 +1,5 @@
 use crate::{
-    gamedata::MapClaim,
+    gamedata::{BingoLine, MapClaim},
     gamemap::GameMap,
     gameroom::{RoomConfiguration, RoomStatus},
 };
@@ -17,7 +17,18 @@ pub enum ClientEvent {
 pub enum ServerEvent {
     RoomUpdate(RoomStatus),
     RoomConfigUpdate(RoomConfiguration),
-    MapsLoadResult { loaded: bool },
-    GameStart { maps: Vec<GameMap> },
-    CellClaim { cell_id: usize, claim: MapClaim },
+    MapsLoadResult {
+        loaded: bool,
+    },
+    GameStart {
+        maps: Vec<GameMap>,
+    },
+    CellClaim {
+        cell_id: usize,
+        claim: MapClaim,
+    },
+    AnnounceBingo {
+        #[serde(flatten)]
+        line: BingoLine,
+    },
 }

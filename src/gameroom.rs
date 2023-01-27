@@ -8,7 +8,7 @@ use crate::{
     channel::ChannelAddress,
     client::GameClient,
     config::TEAMS,
-    gamedata::{ActiveGameData, MapCell},
+    gamedata::{ActiveGameData, BingoLine, MapCell},
     gamemap::GameMap,
     gameteam::{GameTeam, TeamIdentifier},
     rest::auth::PlayerIdentity,
@@ -216,6 +216,12 @@ impl GameRoom {
             .enumerate()
             .filter(|m| m.1.uid == uid)
             .next()
+    }
+
+    pub fn check_for_bingos(&self) -> Vec<BingoLine> {
+        self.active.as_ref().map_or(Vec::new(), |a| {
+            a.check_for_bingos(self.config.grid_size.into())
+        })
     }
 }
 

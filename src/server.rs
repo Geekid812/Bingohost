@@ -256,6 +256,9 @@ impl GameServer {
     ) {
         let mut lock = self.rooms.lock().expect("lock poisoned");
         if let Some(room) = lock.get_mut(room_id) {
+            if !room.has_started() {
+                return;
+            }
             if let Some(player) = room.get_player(player_id) {
                 let claim = MapClaim {
                     player: NetworkPlayer::from(player),
@@ -268,7 +271,7 @@ impl GameServer {
                     .get_cell_record(cell_id)
                     .expect("cells are correctly initialized");
 
-                // unwrap here is safe because we check for none previously
+                // unwrap here is safe because we check for none
                 if cell.claim.is_none() || claim.time < cell.claim.as_ref().unwrap().time {
                     cell.claim = Some(claim.clone());
 
@@ -278,7 +281,18 @@ impl GameServer {
                             cell_id: cell_id,
                             claim: claim,
                         },
-                    )
+                    );
+
+                    let bingos = room.check_for_bingos();
+                    if bingos.len() > 0 {
+                        self.channels.broadcast(
+                            room.channel(),
+                            ServerEvent::AnnounceBingo {
+                                line: bingos[0].clone(),
+                            },
+                        );
+                        room.set_started(false);
+                    }
                 }
             }
         }

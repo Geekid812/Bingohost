@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use serde::{Serialize, Serializer};
+use serde_repr::Serialize_repr;
 
 use crate::gameroom::{Medal, NetworkPlayer};
 
@@ -22,6 +23,45 @@ impl ActiveGameData {
             cells,
         }
     }
+
+    pub fn check_for_bingos(&self, grid_size: usize) -> Vec<BingoLine> {
+        let mut bingos = Vec::new();
+        let mut iter = self.cells.iter();
+        // Horizontal
+        for i in 0..grid_size {
+            let mut line = iter.clone().take(grid_size);
+            let first = line
+                .next()
+                .expect("invalid grid_size")
+                .claim
+                .as_ref()
+                .and_then(|c| c.player.team);
+            let unique_team = line.fold(first, |acc, x| {
+                acc.and_then(|y| {
+                    if x.claim.as_ref().and_then(|c| c.player.team) == Some(y) {
+                        Some(y)
+                    } else {
+                        None
+                    }
+                })
+            });
+
+            if let Some(team) = unique_team {
+                bingos.push(BingoLine {
+                    direction: Direction::Horizontal,
+                    index: i as u32,
+                    team,
+                });
+            }
+
+            // advance_by(n) is unstable, manually skip until the next line
+            for _ in 0..grid_size {
+                iter.next();
+            }
+        }
+
+        bingos
+    }
 }
 
 fn serialize_time<S: Serializer>(time: &Instant, serializer: S) -> Result<S::Ok, S::Error> {
@@ -38,4 +78,19 @@ pub struct MapClaim {
     pub player: NetworkPlayer,
     pub time: u64,
     pub medal: Medal,
+}
+
+#[derive(Serialize, Clone)]
+pub struct BingoLine {
+    pub direction: Direction,
+    pub index: u32,
+    pub team: usize,
+}
+
+#[derive(Serialize_repr, Clone, Copy)]
+#[repr(u32)]
+pub enum Direction {
+    Horizontal = 0,
+    Vertical = 1,
+    Diagonal = 2,
 }
