@@ -26,10 +26,11 @@ impl ActiveGameData {
 
     pub fn check_for_bingos(&self, grid_size: usize) -> Vec<BingoLine> {
         let mut bingos = Vec::new();
-        let mut iter = self.cells.iter();
         // Horizontal
         for i in 0..grid_size {
-            let mut line = iter.clone().take(grid_size);
+            let mut line = self.cells[i * grid_size..(i + 1) * grid_size]
+                .iter()
+                .take(grid_size);
             let first = line
                 .next()
                 .expect("invalid grid_size")
@@ -52,11 +53,6 @@ impl ActiveGameData {
                     index: i as u32,
                     team,
                 });
-            }
-
-            // advance_by(n) is unstable, manually skip until the next line
-            for _ in 0..grid_size {
-                iter.next();
             }
         }
 
