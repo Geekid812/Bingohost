@@ -16,6 +16,7 @@ use crate::{
         RoomIdentifier, RoomStatus,
     },
     gameteam::{GameTeam, TeamIdentifier},
+    rest::auth::PlayerIdentity,
     sync::{build_sync_packet, SyncPacket},
 };
 
@@ -205,13 +206,17 @@ impl GameServer {
         self.client_removed(id, player, true);
     }
 
-    fn client_removed(&self, id: ClientId, (room_id, player): PlayerRef, _explicit: bool) {
+    fn client_removed(&self, id: ClientId, (room_id, player): PlayerRef, explicit: bool) {
         let mut lock = self.rooms.lock().expect("lock poisoned");
         if let Some(room) = lock.get_mut(room_id) {
             self.channels.unsubscribe(room.channel(), id);
             if let Some(team_id) = room.get_player(player).and_then(|p| p.team) {
                 let team_channel = room.get_team(team_id).expect("team to exist").channel_id;
                 self.channels.unsubscribe(team_channel, id);
+            }
+
+            if !explicit && room.has_started() {
+                return;
             }
 
             let should_close = room.player_remove(player);
@@ -285,5 +290,29 @@ impl GameServer {
             .expect("lock poisoned")
             .get_mut(room_id)
             .and_then(|room| build_sync_packet(room, player_id))
+    }
+
+    pub fn resubscribe_client(&self, client: &GameClient, (room, player): PlayerRef) {
+        if let Some(room) = self.rooms.lock().expect("lock poisoned").get(room) {
+            self.channels.subscribe(room.channel(), client);
+            if let Some(team) = room.get_player(player).and_then(|p| p.team) {
+                let team_channel = room
+                    .get_team(team)
+                    .expect("teams should not be mismatched")
+                    .channel_id;
+                self.channels.subscribe(team_channel, client);
+            }
+        }
+    }
+
+    pub fn try_reconnect(&self, identity: &PlayerIdentity) -> Option<PlayerRef> {
+        let rooms = self.rooms.lock().expect("lock poisoned");
+        for (room_id, room) in rooms.iter() {
+            let id_result = room.identify_player(identity);
+            if let Some(player_id) = id_result {
+                return Some((room_id, player_id));
+            }
+        }
+        return None;
     }
 }

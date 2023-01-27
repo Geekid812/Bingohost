@@ -76,12 +76,12 @@ async fn main() {
         let server = server_arc.clone();
         tokio::spawn(async move {
             let mut protocol = protocol::Protocol::new(socket, auth);
-            let identity = match protocol.handshake().await {
-                Some(i) => i,
+            let state = match protocol.handshake(&server).await {
+                Some(s) => s,
                 None => return,
             };
             let client_id = CLIENT_COUNT.fetch_add(1, Ordering::Relaxed);
-            let player = client::GameClient::new(client_id, server, protocol, identity);
+            let player = client::GameClient::new(client_id, server, protocol, state);
             player.run().await;
         });
     }

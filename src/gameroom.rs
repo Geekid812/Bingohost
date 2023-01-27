@@ -156,6 +156,14 @@ impl GameRoom {
         })
     }
 
+    pub fn identify_player(&self, identity: &PlayerIdentity) -> Option<PlayerIdentifier> {
+        self.members
+            .iter()
+            .filter(|(_, p)| &p.identity == identity)
+            .next()
+            .map(|(id, _)| id)
+    }
+
     pub fn player_join(
         &mut self,
         client: &GameClient,

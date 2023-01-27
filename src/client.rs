@@ -6,7 +6,7 @@ use tracing::info;
 use crate::config::TEAMS;
 use crate::events::{ClientEvent, ServerEvent};
 use crate::gameroom::PlayerRef;
-use crate::protocol::Protocol;
+use crate::protocol::{InitialClientState, Protocol};
 use crate::requests::{BaseRequest, CreateRoomResponse, Request, Response};
 use crate::rest::auth::PlayerIdentity;
 use crate::GlobalServer;
@@ -26,18 +26,22 @@ impl GameClient {
         id: ClientId,
         server: GlobalServer,
         protocol: Protocol,
-        identity: PlayerIdentity,
+        initial: InitialClientState,
     ) -> Self {
         Self {
             id,
             server,
             protocol: Arc::new(protocol),
-            identity,
-            player_id: None,
+            identity: initial.identity,
+            player_id: initial.player,
         }
     }
 
     pub async fn run(mut self) {
+        if let Some(player_ref) = self.player_id {
+            self.server.resubscribe_client(&self, player_ref);
+        }
+
         loop {
             let data = self.protocol.recv().await;
             match data {
@@ -133,8 +137,13 @@ impl GameClient {
                 }
             }
             Request::Sync => {
+                if (self.player_id.is_none()) {
+                    return Response::Error {
+                        error: "Sync failed, the game you joined may have ended already."
+                            .to_string(),
+                    };
+                }
                 match self.server.sync_client(self.player_id.unwrap()) {
-                    // TODO don't unwrap
                     Some(sync) => Response::Sync(sync),
                     None => Response::Error {
                         error: "Sync error".to_string(),

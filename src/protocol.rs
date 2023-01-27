@@ -8,7 +8,9 @@ use tokio::net::TcpStream;
 use tracing::{error, info, warn};
 
 use crate::config;
+use crate::gameroom::PlayerRef;
 use crate::rest::auth::{Authenticator, PlayerIdentity, ValidationError};
+use crate::server::GameServer;
 use crate::util::version::Version;
 
 pub struct Protocol {
@@ -26,7 +28,7 @@ impl Protocol {
         }
     }
 
-    pub async fn handshake(&mut self) -> Option<PlayerIdentity> {
+    pub async fn handshake(&mut self, server: &GameServer) -> Option<InitialClientState> {
         if self.state() != ConnectionState::Closed {
             warn!(
                 "Handshake was requested when the connection was not closed: {:?}",
@@ -81,9 +83,11 @@ impl Protocol {
         };
 
         info!("Authentificated client: {:?}", identity);
-        self.handshake_success(&identity).await;
+        let reconnect_state = server.try_reconnect(&identity);
+        self.handshake_success(&identity, reconnect_state.is_some())
+            .await;
         self.set_state(ConnectionState::Connected);
-        return Some(identity);
+        return Some(InitialClientState::new(identity, reconnect_state));
     }
 
     fn state(&self) -> ConnectionState {
@@ -106,10 +110,14 @@ impl Protocol {
         .unwrap_or_default();
     }
 
-    async fn handshake_success(&self, identity: &PlayerIdentity) {
+    async fn handshake_success(&self, identity: &PlayerIdentity, reconnect: bool) {
         self.send_inner(
             &to_string(&HandshakeResponse {
-                code: HandshakeCode::Ok,
+                code: if reconnect {
+                    HandshakeCode::CanReconnect
+                } else {
+                    HandshakeCode::Ok
+                },
                 username: Some(identity.display_name.clone()),
             })
             .expect("json conversion to pass"),
@@ -156,6 +164,17 @@ impl Protocol {
     }
 }
 
+pub struct InitialClientState {
+    pub identity: PlayerIdentity,
+    pub player: Option<PlayerRef>,
+}
+
+impl InitialClientState {
+    pub fn new(identity: PlayerIdentity, player: Option<PlayerRef>) -> Self {
+        Self { identity, player }
+    }
+}
+
 #[derive(Deserialize)]
 struct HandshakeRequest {
     version: String,
@@ -177,6 +196,7 @@ enum HandshakeCode {
     IncompatibleVersion = 2,
     AuthFailure = 3,
     AuthRefused = 4,
+    CanReconnect = 5,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
