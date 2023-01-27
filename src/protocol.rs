@@ -139,11 +139,10 @@ impl Protocol {
     }
 
     async fn send_inner(&self, message: &str) -> io::Result<()> {
-        let f = (message.len() as i32).to_le_bytes();
-        let msg_buf = message.as_bytes();
+        let mut msg = (message.len() as i32).to_le_bytes().to_vec();
+        msg.extend(message.as_bytes());
         let mut writer = &self.socket;
-        writer.write_all(&f).await?;
-        writer.write_all(&msg_buf).await?;
+        writer.write_all(&msg).await?;
         Ok(())
     }
 
