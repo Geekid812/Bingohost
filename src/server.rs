@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 use generational_arena::Arena;
 use rand::{distributions::Uniform, prelude::Distribution};
 use tokio::{join, task};
+use tracing::error;
 
 use crate::{
     channel::ChannelCollection,
@@ -108,13 +109,17 @@ impl GameServer {
 
                     room.add_maps(maps);
                     self.channels
-                        .broadcast(room.channel(), ServerEvent::MapsLoadResult { loaded: true })
+                        .broadcast(room.channel(), ServerEvent::MapsLoadResult { error: None })
                 }
-                // TODO: do something with the error (display to clients?)
-                Err(_) => self.channels.broadcast(
-                    room.channel(),
-                    ServerEvent::MapsLoadResult { loaded: false },
-                ),
+                Err(e) => {
+                    error!("load_maps error: {}", e);
+                    self.channels.broadcast(
+                        room.channel(),
+                        ServerEvent::MapsLoadResult {
+                            error: Some(e.to_string()),
+                        },
+                    )
+                }
             }
         }
     }

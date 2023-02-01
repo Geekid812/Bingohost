@@ -18,7 +18,7 @@ pub enum ServerEvent {
     RoomUpdate(RoomStatus),
     RoomConfigUpdate(RoomConfiguration),
     MapsLoadResult {
-        loaded: bool,
+        error: Option<String>,
     },
     GameStart {
         maps: Vec<GameMap>,
