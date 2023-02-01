@@ -273,7 +273,7 @@ pub struct RoomConfiguration {
     pub medal: Medal,
     pub time_limit: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub mappack_id: Option<String>,
+    pub mappack_id: Option<u32>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize_repr, Deserialize_repr, PartialEq, Eq)]

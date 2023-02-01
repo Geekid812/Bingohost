@@ -56,6 +56,28 @@ async fn get_maps(
     Ok(maps)
 }
 
+pub async fn get_mappack_tracks(
+    client: &Client,
+    tmxid: u32,
+) -> Result<Vec<GameMap>, reqwest::Error> {
+    let maps: Vec<TMExchangeMap> = client
+        .get(
+            Url::from_str(&format!(
+                "{}{}{}",
+                tmexchange::BASE,
+                tmexchange::MAPPACK_MAPS,
+                tmxid
+            ))
+            .expect("mappack url to be valid"),
+        )
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    Ok(maps.into_iter().map(|m| m.into()).collect())
+}
+
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 struct TMExchangeMap {

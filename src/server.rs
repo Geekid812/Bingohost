@@ -10,7 +10,7 @@ use crate::{
     config::{self, JOINCODE_CHARS, JOINCODE_LENGTH},
     events::ServerEvent,
     gamedata::MapClaim,
-    gamemap::{MapStock, Receiver, Sender},
+    gamemap::{MapQuery, MapStock, Receiver, Sender},
     gameroom::{
         GameRoom, JoinRoomError, MapMode, Medal, NetworkPlayer, PlayerRef, RoomConfiguration,
         RoomIdentifier, RoomStatus,
@@ -84,22 +84,25 @@ impl GameServer {
         let room_id = self.rooms.lock().expect("lock poisoned").insert(room);
         tokio::spawn(self.clone().load_maps(
             room_id,
-            config.selection,
-            config.grid_size as usize * config.grid_size as usize,
+            MapQuery::new(
+                config.selection,
+                config.grid_size as usize * config.grid_size as usize,
+                config.mappack_id,
+            ),
         ));
         ((room_id, player_id), room_name, code, vec![team1, team2])
     }
 
-    async fn load_maps(self: Arc<Self>, room: RoomIdentifier, selection: MapMode, count: usize) {
-        let maps_result = self.maps.get_maps(selection, count).await;
+    async fn load_maps(self: Arc<Self>, room: RoomIdentifier, query: MapQuery) {
+        let maps_result = self.maps.get_maps(&query).await;
 
         task::yield_now().await; // make sure we at least yield once (get_maps may not always yield)
         if let Some(room) = self.rooms.lock().expect("lock poisoned").get_mut(room) {
             match maps_result {
-                Some(maps) => {
+                Ok(maps) => {
                     // Check if map mode has changed during the load. If so, return the maps to the queue
-                    if room.config().selection != selection {
-                        self.maps.extend_maps(selection, maps);
+                    if room.config().selection != query.mode {
+                        self.maps.extend_maps(query.mode, maps);
                         return;
                     }
 
@@ -107,7 +110,8 @@ impl GameServer {
                     self.channels
                         .broadcast(room.channel(), ServerEvent::MapsLoadResult { loaded: true })
                 }
-                None => self.channels.broadcast(
+                // TODO: do something with the error (display to clients?)
+                Err(_) => self.channels.broadcast(
                     room.channel(),
                     ServerEvent::MapsLoadResult { loaded: false },
                 ),
@@ -120,15 +124,21 @@ impl GameServer {
         if let Some(room) = self.rooms.lock().expect("lock poisoned").get_mut(room_id) {
             let old_grid_size = room.config().grid_size;
             let old_selection = room.config().selection;
+            let old_mappack = room.config().mappack_id;
             room.set_config(config.clone());
 
-            // Fetch / Remove maps if selection or grid size change
-            if config.selection != old_selection {
+            // Fetch / Remove maps if there was a config change in map mode.
+            if config.selection != old_selection
+                || (config.mappack_id.is_some() && config.mappack_id != old_mappack)
+            {
                 self.maps.extend_maps(old_selection, room.remove_all_maps());
                 tokio::spawn(self.clone().load_maps(
                     room_id,
-                    config.selection,
-                    (config.grid_size * config.grid_size) as usize,
+                    MapQuery::new(
+                        config.selection,
+                        (config.grid_size * config.grid_size) as usize,
+                        config.mappack_id,
+                    ),
                 ));
             } else {
                 let map_diff = usize::abs_diff(
@@ -136,7 +146,10 @@ impl GameServer {
                     old_grid_size as usize * old_grid_size as usize,
                 );
                 if config.grid_size > old_grid_size {
-                    tokio::spawn(self.clone().load_maps(room_id, config.selection, map_diff));
+                    tokio::spawn(self.clone().load_maps(
+                        room_id,
+                        MapQuery::new(config.selection, map_diff, config.mappack_id),
+                    ));
                 } else if config.grid_size < old_grid_size {
                     self.maps
                         .extend_maps(old_selection, room.remove_maps(map_diff));

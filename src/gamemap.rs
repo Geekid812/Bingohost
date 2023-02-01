@@ -1,8 +1,8 @@
-use std::{
-    sync::Mutex,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
+use anyhow::anyhow;
+use parking_lot::Mutex;
+use rand::seq::{IteratorRandom, SliceRandom};
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client,
@@ -15,10 +15,10 @@ use tracing::{info, warn};
 use crate::{
     config,
     gameroom::MapMode,
-    rest::tmexchange::{get_randomtmx, get_totd},
+    rest::tmexchange::{get_mappack_tracks, get_randomtmx, get_totd},
 };
 
-pub type MapResult = Option<Vec<GameMap>>;
+pub type MapResult = anyhow::Result<Vec<GameMap>>;
 pub type Sender = UnboundedSender<(MapMode, usize)>;
 pub type Receiver = UnboundedReceiver<(MapMode, usize)>;
 
@@ -61,13 +61,9 @@ impl MapStock {
             match rx.recv().await {
                 Some((mode, count)) => {
                     let queue_full = match mode {
-                        MapMode::TOTD => {
-                            self.totd.lock().expect("lock poisoned").size()
-                                >= config::MAP_QUEUE_CAPACITY
-                        }
+                        MapMode::TOTD => self.totd.lock().size() >= config::MAP_QUEUE_CAPACITY,
                         MapMode::RandomTMX => {
-                            self.random_tmx.lock().expect("lock poisoned").size()
-                                >= config::MAP_QUEUE_CAPACITY
+                            self.random_tmx.lock().size() >= config::MAP_QUEUE_CAPACITY
                         }
                         MapMode::Mappack => false,
                     };
@@ -81,7 +77,7 @@ impl MapStock {
                         MapMode::RandomTMX => {
                             (get_randomtmx(&self.client, count).await, &self.random_tmx)
                         }
-                        MapMode::Mappack => continue, // TODO
+                        MapMode::Mappack => continue, // mappacks don't have queues, this should be unreachable
                     };
                     match result {
                         Ok(maps) => {
@@ -90,7 +86,7 @@ impl MapStock {
                                 mode,
                                 count
                             );
-                            queue.lock().expect("lock poisoned").extend(maps)
+                            queue.lock().extend(maps)
                         }
                         Err(e) => tracing::error!("fetch_loop failure: {}", e),
                     };
@@ -100,15 +96,23 @@ impl MapStock {
         }
     }
 
-    pub async fn get_maps(&self, mode: MapMode, count: usize) -> MapResult {
+    pub async fn get_maps(&self, query: &MapQuery) -> MapResult {
         self.notifier
-            .send((mode, count))
+            .send((query.mode, query.count))
             .expect("MapStock notifier failed");
 
-        match mode {
-            MapMode::TOTD => Self::get_from_queue(&self.totd, count).await,
-            MapMode::RandomTMX => Self::get_from_queue(&self.random_tmx, count).await,
-            MapMode::Mappack => None, // TODO
+        match query.mode {
+            MapMode::TOTD => Self::get_from_queue(&self.totd, query.count).await,
+            MapMode::RandomTMX => Self::get_from_queue(&self.random_tmx, query.count).await,
+            MapMode::Mappack => {
+                self.get_mappack(
+                    query
+                        .mappack_id
+                        .expect("mode is mappack and mappack id should exist"),
+                    query.count,
+                )
+                .await
+            }
         }
     }
 
@@ -122,21 +126,38 @@ impl MapStock {
     }
 
     fn extend_queue(queue: &Mutex<MapQueue>, maps: Vec<GameMap>) {
-        queue.lock().expect("lock poisioned").extend(maps)
+        queue.lock().extend(maps)
+    }
+
+    async fn get_mappack(&self, tmxid: u32, count: usize) -> MapResult {
+        get_mappack_tracks(&self.client, tmxid)
+            .await
+            .map_err(|e| anyhow::Error::new(e))
+            .and_then(|mut maps| {
+                if maps.len() < count {
+                    return Err(anyhow!(
+                        "Insufficient maps in the mappack: needs {} tracks, but only has {}",
+                        count,
+                        maps.len(),
+                    ));
+                }
+                maps.shuffle(&mut rand::thread_rng());
+                Ok(maps.into_iter().take(count).collect())
+            })
     }
 
     async fn get_from_queue(queue: &Mutex<MapQueue>, count: usize) -> MapResult {
         let timeout = Instant::now() + config::TMX_FETCH_TIMEOUT;
         loop {
             {
-                let mut lock = queue.lock().ok()?;
+                let mut lock = queue.lock();
                 let result = lock.get(count);
-                if result.is_some() {
-                    return result;
+                if let Some(maps) = result {
+                    return Ok(maps);
                 }
             }
             if Instant::now() > timeout {
-                return None;
+                return Err(anyhow!("Map request timed out"));
             }
             sleep(Duration::from_millis(100)).await;
         }
@@ -154,7 +175,7 @@ impl MapQueue {
         }
     }
 
-    pub fn get(&mut self, count: usize) -> MapResult {
+    pub fn get(&mut self, count: usize) -> Option<Vec<GameMap>> {
         let length = self.stock.len();
         if length < count {
             return None;
@@ -177,4 +198,20 @@ pub struct GameMap {
     pub uid: String,
     pub name: String,
     pub author_name: String,
+}
+
+pub struct MapQuery {
+    pub mode: MapMode,
+    pub count: usize,
+    pub mappack_id: Option<u32>,
+}
+
+impl MapQuery {
+    pub fn new(mode: MapMode, count: usize, mappack_id: Option<u32>) -> Self {
+        Self {
+            mode,
+            count,
+            mappack_id,
+        }
+    }
 }
