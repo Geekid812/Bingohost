@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::anyhow;
 use parking_lot::Mutex;
-use rand::seq::{IteratorRandom, SliceRandom};
+use rand::seq::SliceRandom;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client,
@@ -132,7 +132,13 @@ impl MapStock {
     async fn get_mappack(&self, tmxid: u32, count: usize) -> MapResult {
         get_mappack_tracks(&self.client, tmxid)
             .await
-            .map_err(|e| anyhow::Error::new(e))
+            .map_err(|e|
+                if e.is_decode() {
+                    return anyhow!("Invalid reply from TMX server. The mappack may not exist, or it is hidden/unreleased.");
+                } else {
+                    return anyhow::Error::new(e);
+                }
+            )
             .and_then(|mut maps| {
                 if maps.len() < count {
                     return Err(anyhow!(
@@ -157,7 +163,10 @@ impl MapStock {
                 }
             }
             if Instant::now() > timeout {
-                return Err(anyhow!("Map request timed out"));
+                return Err(anyhow!(
+                    "Map request to the TMX servers timed out after {}s",
+                    config::TMX_FETCH_TIMEOUT.as_secs()
+                ));
             }
             sleep(Duration::from_millis(100)).await;
         }
