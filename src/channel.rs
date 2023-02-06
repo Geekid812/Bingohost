@@ -4,7 +4,7 @@ use std::{
     io,
     sync::{Arc, Mutex, RwLock},
 };
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::{
     client::{ClientId, GameClient},
@@ -37,7 +37,7 @@ impl Channel {
     }
 
     pub fn broadcast(&self, message: String) {
-        info!("Broadcasting: {}", message);
+        debug!("Broadcasting: {}", message);
 
         let msg = Arc::new(message);
         for client in self.clients.lock().expect("lock poisoned").values() {
