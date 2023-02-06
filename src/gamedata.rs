@@ -86,7 +86,8 @@ pub struct BingoLine {
 #[derive(Serialize_repr, Clone, Copy)]
 #[repr(u32)]
 pub enum Direction {
-    Horizontal = 0,
-    Vertical = 1,
-    Diagonal = 2,
+    None = 0,
+    Horizontal = 1,
+    Vertical = 2,
+    Diagonal = 3,
 }
