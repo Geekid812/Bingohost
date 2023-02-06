@@ -1,7 +1,7 @@
 use std::io::ErrorKind;
 use std::sync::Arc;
 
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::config::TEAMS;
 use crate::events::{ClientEvent, ServerEvent};
@@ -46,14 +46,14 @@ impl GameClient {
             let data = self.protocol.recv().await;
             match data {
                 Ok(text) => {
-                    info!("Received: {}", text);
+                    debug!("Received: {}", text);
                     // Match a request
                     if let Ok(request) = serde_json::from_str::<BaseRequest>(&text) {
                         let res = self.handle_request(&request.variant).await;
                         let response = request.reply(res);
                         let res_text =
                             serde_json::to_string(&response).expect("response serialization");
-                        info!("Response: {}", &res_text);
+                        debug!("Response: {}", &res_text);
                         let sent = self.protocol.send(&res_text).await;
                         if let Err(e) = sent {
                             self.protocol.error(&e.to_string()).await;
