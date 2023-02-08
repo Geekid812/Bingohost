@@ -52,11 +52,11 @@ pub const AUTHENTICATION_API_SECRET: &'static str = env!("AUTH_SECRET");
 pub const TMX_USERAGENT: &'static str = env!("TMX_USERAGENT");
 
 pub const TEAMS: [(&'static str, &'static str); 6] = [
-    ("Red", "D84315"),
+    ("Red", "F81315"),
     ("Green", "8BC34A"),
     ("Blue", "0095FF"),
     ("Cyan", "4DD0E1"),
-    ("Pink", "D81B60"),
+    ("Pink", "E04980"),
     ("Yellow", "FFFF00"),
 ];
 
