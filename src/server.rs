@@ -74,8 +74,14 @@ impl GameServer {
         let room_name = room.name().to_owned();
 
         // Add the two starting teams and the host
-        let team1 = room.create_team(self.channels.create_one()).clone();
-        let team2 = room.create_team(self.channels.create_one()).clone();
+        let team1 = room
+            .create_team(self.channels.create_one())
+            .expect("creating initial 1st team")
+            .clone();
+        let team2 = room
+            .create_team(self.channels.create_one())
+            .expect("creating initial 2nd team")
+            .clone();
         let player_id = room
             .player_join(&host, true)
             .expect("adding host to a new room");

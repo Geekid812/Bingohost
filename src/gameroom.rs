@@ -3,6 +3,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use thiserror::Error;
+use tracing::warn;
 
 use crate::{
     channel::ChannelAddress,
@@ -118,10 +119,13 @@ impl GameRoom {
         self.teams.get(player)
     }
 
-    pub fn create_team(&mut self, channel: ChannelAddress) -> &GameTeam {
+    pub fn create_team(&mut self, channel: ChannelAddress) -> Option<&GameTeam> {
         let team_count = self.teams.len();
         if team_count >= TEAMS.len() {
-            panic!("attempted to create more than {} teams", TEAMS.len());
+            // FIXME avoiding panic here
+            // panic!("attempted to create more than {} teams", TEAMS.len());
+            warn!("attempted to create more than {} teams", TEAMS.len());
+            return None;
         }
 
         let mut rng = rand::thread_rng();
@@ -131,7 +135,7 @@ impl GameRoom {
         }
 
         self.teams.push(GameTeam::new(team_count, idx, channel));
-        self.teams.last().unwrap()
+        self.teams.last()
     }
 
     fn team_exsits(&self, id: usize) -> bool {
