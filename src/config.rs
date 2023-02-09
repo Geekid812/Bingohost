@@ -63,6 +63,8 @@ pub const TEAMS: [(&'static str, &'static str); 6] = [
 pub const JOINCODE_LENGTH: u32 = 6;
 pub const JOINCODE_CHARS: [char; 10] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
+pub const MAXIMUM_PACKET_SIZE: i32 = 512;
+
 pub mod routes {
     pub mod openplanet {
         pub const BASE: &'static str = "https://openplanet.dev";
