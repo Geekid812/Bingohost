@@ -131,6 +131,11 @@ impl Protocol {
         let mut reader = &self.socket;
         reader.read_exact(&mut buf).await?;
         let size = i32::from_le_bytes(buf);
+
+        if size < 1 || size > config::MAXIMUM_PACKET_SIZE {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "Invalid packet size"));
+        }
+
         let mut msg_buf = vec![0; size as usize];
         reader.read_exact(&mut msg_buf).await?;
         let message = String::from_utf8(msg_buf)
