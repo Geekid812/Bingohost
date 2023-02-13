@@ -81,12 +81,12 @@ impl MapStock {
                     };
                     match result {
                         Ok(maps) => {
+                            let added = queue.lock().extend(maps);
                             tracing::info!(
                                 "map queue for {:?} was extended by {} maps",
                                 mode,
-                                count
+                                added
                             );
-                            queue.lock().extend(maps)
                         }
                         Err(e) => tracing::error!("fetch_loop failure: {}", e),
                     };
@@ -119,13 +119,17 @@ impl MapStock {
     pub fn extend_maps(&self, mode: MapMode, maps: Vec<GameMap>) {
         info!("Replacing {} maps for mode {:?}", maps.len(), mode);
         match mode {
-            MapMode::TOTD => Self::extend_queue(&self.totd, maps),
-            MapMode::RandomTMX => Self::extend_queue(&self.random_tmx, maps),
+            MapMode::TOTD => {
+                Self::extend_queue(&self.totd, maps);
+            }
+            MapMode::RandomTMX => {
+                Self::extend_queue(&self.random_tmx, maps);
+            }
             MapMode::Mappack => (),
         }
     }
 
-    fn extend_queue(queue: &Mutex<MapQueue>, maps: Vec<GameMap>) {
+    fn extend_queue(queue: &Mutex<MapQueue>, maps: Vec<GameMap>) -> usize {
         queue.lock().extend(maps)
     }
 
@@ -192,8 +196,18 @@ impl MapQueue {
         Some(self.stock.split_off(length - count))
     }
 
-    pub fn extend(&mut self, maps: Vec<GameMap>) {
-        self.stock.extend(maps)
+    pub fn extend(&mut self, maps: Vec<GameMap>) -> usize {
+        let filtered: Vec<GameMap> = maps
+            .into_iter()
+            .filter(|m| {
+                self.stock
+                    .iter()
+                    .all(|queued| queued.track_id != m.track_id)
+            })
+            .collect();
+        let added = filtered.len();
+        self.stock.extend(filtered);
+        added
     }
 
     pub fn size(&self) -> usize {
