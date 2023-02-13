@@ -65,6 +65,8 @@ pub const JOINCODE_CHARS: [char; 10] = ['0', '1', '2', '3', '4', '5', '6', '7', 
 
 pub const MAXIMUM_PACKET_SIZE: i32 = 2048;
 
+pub const MXRANDOM_MAX_AUTHOR_TIME: i32 = Duration::from_secs(180).as_millis() as i32;
+
 pub mod routes {
     pub mod openplanet {
         pub const BASE: &'static str = "https://openplanet.dev";

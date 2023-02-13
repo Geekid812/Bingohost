@@ -3,6 +3,7 @@ use std::str::FromStr;
 use reqwest::{Client, Url};
 use serde::Deserialize;
 
+use crate::config;
 use crate::config::routes::tmexchange;
 use crate::gamemap::GameMap;
 
@@ -19,6 +20,7 @@ pub async fn get_randomtmx(client: &Client, count: usize) -> Result<Vec<GameMap>
             ("vehicles", "1"),
         ],
         count,
+        |m| m.author_time <= config::MXRANDOM_MAX_AUTHOR_TIME,
     )
     .await
 }
@@ -30,16 +32,21 @@ pub async fn get_totd(client: &Client, count: usize) -> Result<Vec<GameMap>, req
             .expect("map search url to be valid"),
         &[("api", "on"), ("random", "1"), ("mode", "25")],
         count,
+        |_| true,
     )
     .await
 }
 
-async fn get_maps(
+async fn get_maps<F>(
     client: &Client,
     url: Url,
     params: &[(&str, &str)],
     mut count: usize,
-) -> Result<Vec<GameMap>, reqwest::Error> {
+    valid: F,
+) -> Result<Vec<GameMap>, reqwest::Error>
+where
+    F: Fn(&TMExchangeMap) -> bool,
+{
     let mut maps = Vec::with_capacity(count);
     while count > 0 {
         let map: MapsResult = client
@@ -50,7 +57,11 @@ async fn get_maps(
             .error_for_status()?
             .json()
             .await?;
-        maps.push(map.results[0].clone().into());
+        let tmxmap = map.results[0].clone();
+        if !valid(&tmxmap) {
+            continue;
+        }
+        maps.push(tmxmap.into());
         count -= 1;
     }
     Ok(maps)
@@ -87,6 +98,8 @@ struct TMExchangeMap {
     track_uid: String,
     name: String,
     username: String,
+    #[serde(rename = "AuthorTime")]
+    author_time: i32,
 }
 
 impl Into<GameMap> for TMExchangeMap {
