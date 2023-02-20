@@ -21,6 +21,7 @@ pub mod gameteam;
 pub mod protocol;
 pub mod requests;
 pub mod rest;
+pub mod roomlist;
 pub mod server;
 pub mod sync;
 pub mod util;

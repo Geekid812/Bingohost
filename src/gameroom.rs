@@ -15,42 +15,32 @@ use crate::{
     rest::auth::PlayerIdentity,
 };
 
-pub type RoomIdentifier = generational_arena::Index;
 pub type PlayerIdentifier = generational_arena::Index;
 pub type PlayerRef = (RoomIdentifier, PlayerIdentifier);
 
 pub struct GameRoom {
-    name: String,
     config: RoomConfiguration,
     join_code: String,
     members: Arena<PlayerData>,
     teams: Vec<GameTeam>,
-    channel: ChannelAddress,
     maps: Vec<GameMap>,
     active: Option<ActiveGameData>,
 }
 
 impl GameRoom {
-    pub fn create(
-        name: String,
-        join_code: String,
-        config: RoomConfiguration,
-        channel: ChannelAddress,
-    ) -> Self {
+    pub fn create(config: RoomConfiguration, join_code: String) -> Self {
         Self {
-            name,
             config: config,
             join_code,
             members: Arena::new(),
             teams: Vec::new(),
-            channel,
             maps: Vec::new(),
             active: None,
         }
     }
 
     pub fn name(&self) -> &str {
-        &self.name
+        &self.config.name
     }
 
     pub fn join_code(&self) -> &str {
@@ -104,7 +94,8 @@ impl GameRoom {
         self.teams.clone()
     }
 
-    pub fn status(&self) -> RoomStatus {
+    pub fn status(&self) -> R    #
+    oomStatus {
         RoomStatus {
             members: self.players(),
             teams: self.teams(),
@@ -269,9 +260,15 @@ impl From<&PlayerData> for NetworkPlayer {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct RoomConfiguration {
+    // Room Settings
+    pub name: String,
+    pub visibility: RoomVisibility,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
     pub size: u32,
     pub randomize: bool,
     pub chat_enabled: bool,
+    // Game Settings
     pub grid_size: u8,
     pub selection: MapMode,
     pub medal: Medal,
@@ -281,7 +278,14 @@ pub struct RoomConfiguration {
 }
 
 #[derive(Clone, Copy, Debug, Serialize_repr, Deserialize_repr, PartialEq, Eq)]
-#[repr(u32)]
+#[repr(u8)]
+pub enum RoomVisibility {
+    Public,
+    Private,
+}
+
+#[derive(Clone, Copy, Debug, Serialize_repr, Deserialize_repr, PartialEq, Eq)]
+#[repr(u8)]
 pub enum MapMode {
     TOTD,
     RandomTMX,
@@ -289,7 +293,7 @@ pub enum MapMode {
 }
 
 #[derive(Clone, Copy, Debug, Serialize_repr, Deserialize_repr, PartialEq, Eq)]
-#[repr(u32)]
+#[repr(u8)]
 pub enum Medal {
     Author,
     Gold,

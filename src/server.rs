@@ -46,13 +46,6 @@ impl GameServer {
         config: RoomConfiguration,
         host: &GameClient,
     ) -> (PlayerRef, String, String, Vec<GameTeam>) {
-        // Generate room join code
-        let mut rng = rand::thread_rng();
-        let uniform = Uniform::from(0..JOINCODE_CHARS.len());
-        let mut join_code: String = (0..JOINCODE_LENGTH)
-            .map(|_| JOINCODE_CHARS[uniform.sample(&mut rng)])
-            .collect();
-
         while self.find_room(&join_code).is_some() {
             join_code = (0..JOINCODE_LENGTH)
                 .map(|_| JOINCODE_CHARS[uniform.sample(&mut rng)])

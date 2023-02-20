@@ -43,6 +43,7 @@ anyhow = "1.0.68"
 
 # Poison-free mutexes
 parking_lot = "0.12.1"
+once_cell = "1.17.1"
 
 # Depend on a patched tokio runtime to fix inconvenient trait implementations
 [patch.crates-io]
