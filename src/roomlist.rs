@@ -12,7 +12,7 @@ pub type RoomsLock<'a> = MutexGuard<'a, Lazy<Arena<GameRoom>>>;
 
 pub struct RoomIdentifier(Index);
 
-pub fn create_room(config: RoomConfiguration) -> RoomIdentifier {
+pub fn create_room<'a>(config: RoomConfiguration) -> (RoomIdentifier, &'a mut GameRoom) {
     let lock = ROOMS.lock();
     let mut join_code = generate_roomcode();
 
@@ -21,7 +21,8 @@ pub fn create_room(config: RoomConfiguration) -> RoomIdentifier {
     }
 
     let room = GameRoom::create(config, join_code);
-    RoomIdentifier(lock.insert(room))
+    let id = RoomIdentifier(lock.insert(room));
+    (id, lock.get_mut(id.0).expect("room exists after creation"))
 }
 
 pub fn find_room(join_code: String) -> Option<RoomIdentifier> {

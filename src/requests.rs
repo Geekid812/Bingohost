@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     gameroom::{Medal, RoomConfiguration, RoomStatus},
     gameteam::GameTeam,
+    handlers::{Request, Response},
     sync::SyncPacket,
 };
 
@@ -11,14 +12,14 @@ pub struct BaseRequest {
     #[serde(rename = "seq")]
     sequence: u32,
     #[serde(flatten)]
-    pub variant: Request,
+    pub request: Box<dyn Request>,
 }
 
 impl BaseRequest {
-    pub fn reply(&self, response: Response) -> BaseResponse {
+    pub fn build_reply(&self, response: Box<dyn Response>) -> BaseResponse {
         BaseResponse {
             sequence: self.sequence,
-            data: response,
+            response: response,
         }
     }
 }
@@ -28,46 +29,46 @@ pub struct BaseResponse {
     #[serde(rename = "seq")]
     sequence: u32,
     #[serde(flatten)]
-    data: Response,
+    pub response: Box<dyn Response>,
 }
 
-#[derive(Deserialize)]
-#[serde(tag = "request")]
-pub enum Request {
-    Ping,
-    CreateRoom(CreateRoomRequest),
-    JoinRoom {
-        join_code: String,
-    },
-    EditRoomConfig {
-        config: RoomConfiguration,
-    },
-    CreateTeam,
-    StartGame,
-    ClaimCell {
-        uid: String,
-        time: u64,
-        medal: Medal,
-    },
-    Sync,
-}
+// #[derive(Deserialize)]
+// #[serde(tag = "request")]
+// pub enum Request {
+//     Ping,
+//     CreateRoom(CreateRoomRequest),
+//     JoinRoom {
+//         join_code: String,
+//     },
+//     EditRoomConfig {
+//         config: RoomConfiguration,
+//     },
+//     CreateTeam,
+//     StartGame,
+//     ClaimCell {
+//         uid: String,
+//         time: u64,
+//         medal: Medal,
+//     },
+//     Sync,
+// }
 
-#[derive(Serialize)]
-#[serde(untagged)]
-pub enum Response {
-    Pong,
-    Ok,
-    Error {
-        error: String,
-    },
-    CreateRoom(CreateRoomResponse),
-    JoinRoom {
-        name: String,
-        config: RoomConfiguration,
-        status: RoomStatus,
-    },
-    Sync(SyncPacket),
-}
+// #[derive(Serialize)]
+// #[serde(untagged)]
+// pub enum Response {
+//     Pong,
+//     Ok,
+//     Error {
+//         error: String,
+//     },
+//     CreateRoom(CreateRoomResponse),
+//     JoinRoom {
+//         name: String,
+//         config: RoomConfiguration,
+//         status: RoomStatus,
+//     },
+//     Sync(SyncPacket),
+// }
 
 #[derive(Deserialize)]
 pub struct CreateRoomRequest {

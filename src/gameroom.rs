@@ -94,8 +94,7 @@ impl GameRoom {
         self.teams.clone()
     }
 
-    pub fn status(&self) -> R    #
-    oomStatus {
+    pub fn status(&self) -> RoomStatus {
         RoomStatus {
             members: self.players(),
             teams: self.teams(),
@@ -110,7 +109,7 @@ impl GameRoom {
         self.teams.get(player)
     }
 
-    pub fn create_team(&mut self, channel: ChannelAddress) -> Option<&GameTeam> {
+    pub fn create_team(&mut self) -> Option<&GameTeam> {
         let team_count = self.teams.len();
         if team_count >= TEAMS.len() {
             // FIXME avoiding panic here
