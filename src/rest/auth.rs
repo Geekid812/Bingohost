@@ -1,6 +1,7 @@
 // Interacting with the Openplanet Auth API
 use reqwest::{multipart::Form, Client, Url};
 use serde::Deserialize;
+use std::hash::Hash;
 use thiserror::Error;
 
 use crate::config::AUTHENTICATION_API_SECRET;
@@ -50,6 +51,12 @@ impl Authenticator {
 pub struct PlayerIdentity {
     pub account_id: String,
     pub display_name: String,
+}
+
+impl Hash for PlayerIdentity {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.account_id.hash(state);
+    }
 }
 
 #[derive(Error, Debug)]

@@ -1,4 +1,8 @@
-use generational_arena::{Arena, Index, Iter};
+use std::{
+    collections::{hash_map::Iter, HashMap},
+    sync::{Arc, Weak},
+};
+
 use once_cell::sync::Lazy;
 use parking_lot::{Mutex, MutexGuard};
 
@@ -7,44 +11,42 @@ use crate::{
     util::roomcode::generate_roomcode,
 };
 
-static ROOMS: Mutex<Lazy<Arena<GameRoom>>> = Mutex::new(Lazy::new(|| Arena::new()));
-pub type RoomsLock<'a> = MutexGuard<'a, Lazy<Arena<GameRoom>>>;
+static ROOMS: Mutex<Lazy<HashMap<String, OwnedRoom>>> = Mutex::new(Lazy::new(|| HashMap::new()));
+pub type RoomsLock<'a> = MutexGuard<'a, Lazy<HashMap<String, OwnedRoom>>>;
 
-pub struct RoomIdentifier(Index);
+pub type OwnedRoom = Arc<Mutex<GameRoom>>;
+pub type SharedRoom = Weak<Mutex<GameRoom>>;
 
-pub fn create_room<'a>(config: RoomConfiguration) -> (RoomIdentifier, &'a mut GameRoom) {
+pub fn create_room<'a>(config: RoomConfiguration) -> OwnedRoom {
     let lock = ROOMS.lock();
     let mut join_code = generate_roomcode();
 
-    while lock_find_room(&lock, join_code).is_some() {
+    while lock.get(&join_code).is_some() {
         join_code = generate_roomcode();
     }
 
-    let room = GameRoom::create(config, join_code);
-    let id = RoomIdentifier(lock.insert(room));
-    (id, lock.get_mut(id.0).expect("room exists after creation"))
+    let room = Arc::new(Mutex::new(GameRoom::create(config, join_code)));
+    lock.insert(join_code, room.clone());
+    room
 }
 
-pub fn find_room(join_code: String) -> Option<RoomIdentifier> {
-    lock_find_room(&ROOMS.lock(), join_code)
+pub fn find_room(join_code: String) -> Option<OwnedRoom> {
+    ROOMS.lock().get(&join_code).map(|arc| arc.clone())
 }
 
-pub fn get_room<'a>(id: RoomIdentifier) -> Option<&'a mut GameRoom> {
-    ROOMS.lock().get_mut(id.0)
-}
+pub fn remove_room(room: OwnedRoom) {
+    let lock = ROOMS.lock();
 
-pub fn remove_room(id: RoomIdentifier) -> Option<GameRoom> {
-    ROOMS.lock().remove(id.0)
-}
-
-pub fn iter_all<'a>() -> Iter<'a, GameRoom> {
-    ROOMS.lock().iter()
-}
-
-fn lock_find_room(lock: &RoomsLock, join_code: String) -> Option<RoomIdentifier> {
-    let result = lock
+    let to_remove = lock
         .iter()
-        .filter(|(_, room)| room.join_code() == join_code)
-        .next()?;
-    Some(RoomIdentifier(result.0))
+        .filter(|(_, arc)| Arc::ptr_eq(&room, arc))
+        .next();
+
+    if let Some((code, _)) = to_remove {
+        lock.remove(code);
+    }
+}
+
+pub fn iter_all<'a>() -> Iter<'a, String, OwnedRoom> {
+    ROOMS.lock().iter()
 }

@@ -1,18 +1,15 @@
-use server::GameServer;
 use std::{
     net::SocketAddr,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
+    sync::{atomic::AtomicU32, Arc},
 };
-use tokio::{net::TcpSocket, sync::mpsc::unbounded_channel};
+use tokio::net::TcpSocket;
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
 
 pub mod channel;
 pub mod client;
 pub mod config;
+pub mod context;
 pub mod events;
 pub mod gamecommon;
 pub mod gamedata;
@@ -20,15 +17,15 @@ pub mod gamemap;
 pub mod gameroom;
 pub mod gameteam;
 pub mod handlers;
-pub mod protocol;
+pub mod handshake;
+pub mod reconnect;
 pub mod requests;
 pub mod rest;
 pub mod roomlist;
-pub mod server;
+pub mod socket;
 pub mod sync;
 pub mod util;
 
-pub type GlobalServer = Arc<GameServer>;
 pub static CLIENT_COUNT: AtomicU32 = AtomicU32::new(0);
 
 #[tokio::main]
@@ -40,6 +37,7 @@ async fn main() {
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber");
 
+    // Auth setup
     use config::routes::openplanet as route;
     let client = reqwest::Client::new();
     let authenticator = rest::auth::Authenticator::new(
@@ -50,11 +48,7 @@ async fn main() {
     );
     let auth_arc = Arc::new(authenticator);
 
-    let (maps_tx, maps_rx) = unbounded_channel();
-    let server = server::GameServer::new(maps_tx);
-    let server_arc: GlobalServer = Arc::new(server);
-    tokio::spawn(server_arc.clone().spawn(maps_rx));
-
+    // Socket creation
     let socket = TcpSocket::new_v4().expect("ipv4 socket to be created");
     socket
         .set_reuseaddr(true)
@@ -69,23 +63,35 @@ async fn main() {
     );
 
     loop {
-        let (socket, _) = listener
+        let (incoming, _) = listener
             .accept()
             .await
             .expect("incoming socket to be accepted");
 
         info!("accepted a connection");
         let auth = auth_arc.clone();
-        let server = server_arc.clone();
         tokio::spawn(async move {
-            let mut protocol = protocol::Protocol::new(socket, auth);
-            let state = match protocol.handshake(&server).await {
-                Some(s) => s,
-                None => return,
+            let (writer, reader) = socket::spawn(incoming);
+            let (identity, ctx) = match handshake::read_handshake(&mut reader, auth).await {
+                Ok(identity) => {
+                    let ctx = reconnect::recover(&identity);
+                    let data = handshake::HandshakeSuccess {
+                        username: identity.display_name,
+                        can_reconnect: ctx.is_some(),
+                    };
+                    handshake::accept_socket(writer, data);
+                    (Some(identity), ctx)
+                }
+                Err(code) => {
+                    handshake::deny_socket(writer, code);
+                    (None, None)
+                }
             };
-            let client_id = CLIENT_COUNT.fetch_add(1, Ordering::Relaxed);
-            let player = client::GameClient::new(client_id, server, protocol, state);
-            player.run().await;
+
+            if identity.is_none() {
+                return;
+            }
+            client::run_loop(identity.unwrap(), ctx, reader, writer);
         });
     }
 }

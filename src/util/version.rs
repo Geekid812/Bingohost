@@ -2,19 +2,24 @@ use std::cmp::{Ord, Ordering, PartialOrd};
 use std::convert::TryFrom;
 
 #[derive(Eq, PartialEq)]
-pub struct Version(pub i32, pub i32);
+pub struct Version(pub i32, pub i32, pub String);
 
 impl TryFrom<String> for Version {
     type Error = ();
 
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+    fn try_from(mut value: String) -> Result<Self, Self::Error> {
+        let release = String::new();
+        if let Some((prefix, suffix)) = value.split_once('-') {
+            value = prefix.to_owned();
+            release = suffix.to_owned();
+        }
         let mut version_iter = value.split('.');
         let major = version_iter.next().ok_or(())?.parse().map_err(|_| ())?;
         let minor = version_iter.next().ok_or(())?.parse().map_err(|_| ())?;
         if version_iter.next().is_some() {
             return Err(());
         }
-        Ok(Self(major, minor))
+        Ok(Self(major, minor, release))
     }
 }
 
@@ -36,9 +41,9 @@ mod test {
 
     #[test]
     fn check_version_cmp() {
-        let v0 = Version(0, 3);
-        let v1 = Version(1, 0);
-        let v1next = Version(1, 1);
+        let v0 = Version(0, 3, "".to_owned());
+        let v1 = Version(1, 0, "dev".to_owned());
+        let v1next = Version(1, 1, "".to_owned());
 
         assert!(v0 < v1);
         assert!(v1 < v1next);

@@ -1,82 +1,59 @@
-use std::io::ErrorKind;
-use std::sync::Arc;
+use tracing::debug;
 
-use tracing::{debug, info};
-
-use crate::config::TEAMS;
-use crate::events::{ClientEvent, ServerEvent};
-use crate::gameroom::PlayerRef;
-use crate::protocol::{InitialClientState, Protocol};
-use crate::requests::{BaseRequest, CreateRoomResponse};
+use crate::context::GameContext;
+use crate::requests::BaseRequest;
 use crate::rest::auth::PlayerIdentity;
-use crate::GlobalServer;
-
-pub type ClientId = u32;
+use crate::socket::{SocketAction, SocketReader, SocketWriter};
 
 pub struct GameClient {
-    id: ClientId,
-    server: GlobalServer,
-    protocol: Arc<Protocol>,
     identity: PlayerIdentity,
-    player_id: Option<PlayerRef>,
+    ctx: Option<GameContext>,
+    reader: SocketReader,
+    writer: SocketWriter,
+}
+
+pub async fn run_loop(
+    identity: PlayerIdentity,
+    mut ctx: Option<GameContext>,
+    mut reader: SocketReader,
+    writer: SocketWriter,
+) -> LoopExit {
+    loop {
+        let data = reader.recv().await;
+        if data.is_none() {
+            // Client disconnected
+            return if let Some(ctx) = ctx {
+                LoopExit::Linger(identity, ctx)
+            } else {
+                LoopExit::Close
+            };
+        }
+        let msg = data.unwrap();
+        debug!("received: {}", msg);
+
+        // Match a request
+        if let Ok(incoming) = serde_json::from_str::<BaseRequest>(&msg) {
+            let response = incoming.request.handle(&identity, &mut ctx);
+            let outgoing = incoming.build_reply(response);
+            let res_text = serde_json::to_string(&outgoing).expect("response serialization failed");
+            debug!("response: {}", &res_text);
+            let sent = writer.send(SocketAction::Message(res_text));
+        } else {
+            // Match an event
+            // match serde_json::from_str::<ClientEvent>(&msg) {
+            //     Ok(event) => self.handle_event(&event).await,
+            //     Err(e) => self.protocol.error(&e.to_string()).await,
+            // };
+        }
+    }
+}
+
+pub enum LoopExit {
+    Linger(PlayerIdentity, GameContext),
+    Close,
 }
 
 impl GameClient {
-    pub fn new(
-        id: ClientId,
-        server: GlobalServer,
-        protocol: Protocol,
-        initial: InitialClientState,
-    ) -> Self {
-        Self {
-            id,
-            server,
-            protocol: Arc::new(protocol),
-            identity: initial.identity,
-            player_id: initial.player,
-        }
-    }
-
-    pub async fn run(mut self) {
-        if let Some(player_ref) = self.player_id {
-            self.server.resubscribe_client(&self, player_ref);
-        }
-
-        loop {
-            let data = self.protocol.recv().await;
-            match data {
-                Ok(text) => {
-                    debug!("Received: {}", text);
-                    // Match a request
-                    if let Ok(incoming) = serde_json::from_str::<BaseRequest>(&text) {
-                        let response = incoming.request.handle(&mut self);
-                        let outgoing = incoming.build_reply(response);
-                        let res_text =
-                            serde_json::to_string(&outgoing).expect("response serialization");
-                        debug!("Response: {}", &res_text);
-                        let sent = self.protocol.send(&res_text).await;
-                        if let Err(e) = sent {
-                            self.protocol.error(&e.to_string()).await;
-                            return;
-                        }
-                    } else {
-                        // Match an event
-                        match serde_json::from_str::<ClientEvent>(&text) {
-                            Ok(event) => self.handle_event(&event).await,
-                            Err(e) => self.protocol.error(&e.to_string()).await,
-                        };
-                    }
-                }
-                Err(e) if e.kind() == ErrorKind::UnexpectedEof => {
-                    // Handle disconnection
-                    self.handle_disconnect();
-                    break;
-                }
-                Err(e) => self.protocol.error(&e.to_string()).await,
-            }
-        }
-    }
-
     // async fn handle_request(&mut self, variant: &Request) -> Response {
     //     match variant {
     //         Request::Ping => Response::Pong,
@@ -152,50 +129,4 @@ impl GameClient {
     //         }
     //     }
     // }
-
-    async fn handle_event(&mut self, variant: &ClientEvent) {
-        match variant {
-            ClientEvent::ChangeTeam { team_id } => {
-                if let Some(player) = self.player_id {
-                    self.server.change_team(player.clone(), *team_id);
-                }
-            }
-            ClientEvent::LeaveRoom => {
-                if let Some(player) = self.player_id {
-                    self.server.leave(self.id, player);
-                }
-            }
-        }
-    }
-
-    fn handle_disconnect(&mut self) {
-        info!("Client disconnected: {}", self.identity.display_name);
-        self.protocol.close();
-        if let Some(player) = self.player_id {
-            self.server.disconnect(self.id, player);
-        }
-    }
-
-    async fn fire_event(&mut self, event: ServerEvent) {
-        let sent = self
-            .protocol
-            .send(&serde_json::to_string(&event).expect("event serialization"))
-            .await;
-        if let Err(e) = sent {
-            self.protocol.error(&e.to_string()).await;
-            return;
-        }
-    }
-
-    pub fn identity(&self) -> &PlayerIdentity {
-        &self.identity
-    }
-
-    pub fn get_protocol(&self) -> Arc<Protocol> {
-        self.protocol.clone()
-    }
-
-    pub fn get_id(&self) -> ClientId {
-        self.id
-    }
 }
