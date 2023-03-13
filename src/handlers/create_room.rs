@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    client::GameClient,
     config::TEAMS,
     context::{ClientContext, GameContext},
     gamecommon::setup_room,
@@ -26,9 +25,15 @@ pub struct CreateRoomResponse {
 #[typetag::deserialize]
 impl Request for CreateRoom {
     fn handle(&self, ctx: &mut ClientContext) -> Box<dyn Response> {
-        let (lock, room) = roomlist::create_room(self.0.clone());
+        if let Some(room) = ctx.game.as_mut().and_then(|game_ctx| game_ctx.room()) {
+            room.lock().player_remove(&ctx.identity);
+            // TODO: on player removed?
+        }
+        let room_arc = roomlist::create_room(self.0.clone());
+        let mut room = room_arc.lock();
 
         setup_room(&mut room);
+        ctx.game = Some(GameContext::new(&ctx, &room_arc));
         Box::new(CreateRoomResponse {
             name: room.name().to_owned(),
             join_code: room.join_code().to_owned(),

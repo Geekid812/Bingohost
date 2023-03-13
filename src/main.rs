@@ -76,19 +76,19 @@ async fn main() {
         info!("accepted a connection");
         let auth = auth_arc.clone();
         tokio::spawn(async move {
-            let (writer, reader) = socket::spawn(incoming);
+            let (writer, mut reader) = socket::spawn(incoming);
             let ctx = match handshake::read_handshake(&mut reader, auth).await {
                 Ok(identity) => {
                     let ctx = reconnect::recover(&identity);
                     let data = handshake::HandshakeSuccess {
-                        username: identity.display_name,
+                        username: identity.display_name.clone(),
                         can_reconnect: ctx.is_some(),
                     };
-                    handshake::accept_socket(writer, data);
+                    drop(handshake::accept_socket(&writer, data));
                     Some(ClientContext::new(identity, ctx, Arc::new(writer)))
                 }
                 Err(code) => {
-                    handshake::deny_socket(writer, code);
+                    drop(handshake::deny_socket(&writer, code));
                     None
                 }
             };
@@ -96,7 +96,7 @@ async fn main() {
             if ctx.is_none() {
                 return;
             }
-            client::run_loop(ctx.unwrap(), reader);
+            client::run_loop(ctx.unwrap(), reader).await;
         });
     }
 }

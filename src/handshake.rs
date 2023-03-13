@@ -3,6 +3,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
 use serde_repr::Serialize_repr;
+use tokio::sync::mpsc::error::SendError;
 
 use crate::{
     config,
@@ -56,21 +57,27 @@ pub async fn read_handshake(
     return Ok(identity);
 }
 
-pub fn deny_socket(writer: SocketWriter, code: HandshakeCode) {
+pub fn deny_socket(
+    writer: &SocketWriter,
+    code: HandshakeCode,
+) -> Result<(), SendError<SocketAction>> {
     writer.send(SocketAction::Message(
         to_string(&HandshakeResponse { code, data: None }).expect("serializing handshake failed"),
-    ));
-    writer.send(SocketAction::Stop);
+    ))?;
+    writer.send(SocketAction::Stop)
 }
 
-pub fn accept_socket(writer: SocketWriter, data: HandshakeSuccess) {
+pub fn accept_socket(
+    writer: &SocketWriter,
+    data: HandshakeSuccess,
+) -> Result<(), SendError<SocketAction>> {
     writer.send(SocketAction::Message(
         to_string(&HandshakeResponse {
             code: HandshakeCode::Ok,
             data: Some(data),
         })
         .expect("serializing handshake failed"),
-    ));
+    ))
 }
 
 #[derive(Deserialize)]
@@ -89,13 +96,13 @@ struct HandshakeResponse {
 
 #[derive(Serialize)]
 pub struct HandshakeSuccess {
-    username: String,
-    can_reconnect: bool,
+    pub username: String,
+    pub can_reconnect: bool,
 }
 
 #[derive(Serialize_repr, PartialEq, Eq)]
 #[repr(i32)]
-enum HandshakeCode {
+pub enum HandshakeCode {
     Ok = 0,
     ParseError = 1,
     IncompatibleVersion = 2,

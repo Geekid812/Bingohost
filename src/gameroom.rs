@@ -6,9 +6,7 @@ use tracing::warn;
 
 use crate::{
     channel::Channel,
-    client::GameClient,
     config::TEAMS,
-    context::{ClientContext, GameContext},
     gamedata::{ActiveGameData, BingoLine, MapCell},
     gamemap::GameMap,
     gameteam::{GameTeam, TeamIdentifier},

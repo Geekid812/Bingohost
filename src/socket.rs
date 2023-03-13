@@ -32,7 +32,7 @@ async fn run(
     let (reader, writer) = socket.into_split();
     let (rfut, wfut) = (read_loop(reader, read_tx), write_loop(writer, write_rx));
     pin_mut!(rfut, wfut);
-    select(rfut, wfut);
+    select(rfut, wfut).await;
 }
 
 async fn read_loop(mut reader: OwnedReadHalf, read_tx: UnboundedSender<String>) {

@@ -17,14 +17,19 @@ impl Channel {
     }
 
     pub fn cleanup(&mut self) {
-        self.0 = self.0.into_iter().filter(|sink| sink.is_alive()).collect();
+        self.0 = self
+            .0
+            .iter()
+            .filter(|sink| sink.is_alive())
+            .map(WriteSink::clone)
+            .collect();
     }
 
     pub fn broadcast(&self, message: String) {
         debug!("broadcasting: {}", message);
         self.0.iter().for_each(|sink| {
             sink.writer()
-                .map(|sender| sender.send(SocketAction::Message(message)));
+                .map(|sender| sender.send(SocketAction::Message(message.clone())));
         });
     }
 }
