@@ -22,7 +22,7 @@ impl Authenticator {
     pub async fn validate(&self, token: String) -> Result<PlayerIdentity, ValidationError> {
         let form_data = Form::new()
             .text("token", token)
-            .text("secret", AUTHENTICATION_API_SECRET);
+            .text("secret", AUTHENTICATION_API_SECRET.unwrap());
 
         let response: ResponseAuth = self
             .client

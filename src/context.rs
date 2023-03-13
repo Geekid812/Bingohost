@@ -1,8 +1,11 @@
-use crate::{gameroom::PlayerIdentifier, roomlist::SharedRoom};
+use std::sync::Arc;
+
+use crate::{rest::auth::PlayerIdentity, roomlist::SharedRoom, socket::SocketWriter};
 
 pub struct GameContext {
     room: SharedRoom,
-    player_id: PlayerIdentifier,
+    identity: PlayerIdentity,
+    inbox: Arc<SocketWriter>,
 }
 
 impl GameContext {

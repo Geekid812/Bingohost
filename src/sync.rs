@@ -3,7 +3,8 @@ use serde::Serialize;
 use crate::{
     gamedata::ActiveGameData,
     gamemap::GameMap,
-    gameroom::{GameRoom, PlayerIdentifier, RoomConfiguration, RoomStatus},
+    gameroom::{GameRoom, RoomConfiguration, RoomStatus},
+    rest::auth::PlayerIdentity,
 };
 
 #[derive(Serialize)]
@@ -18,8 +19,8 @@ pub struct SyncPacket {
     game_data: Option<ActiveGameData>,
 }
 
-pub fn build_sync_packet(room: &mut GameRoom, player_id: PlayerIdentifier) -> Option<SyncPacket> {
-    room.get_player(player_id).map(|player| SyncPacket {
+pub fn build_sync_packet(room: &mut GameRoom, identity: PlayerIdentity) -> Option<SyncPacket> {
+    room.get_player(identity).map(|player| SyncPacket {
         room_name: room.name().to_string(),
         join_code: room.join_code().to_string(),
         host: player.operator,

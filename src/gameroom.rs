@@ -1,4 +1,3 @@
-use generational_arena::Arena;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -6,22 +5,19 @@ use thiserror::Error;
 use tracing::warn;
 
 use crate::{
-    channel::ChannelAddress,
     client::GameClient,
     config::TEAMS,
     gamedata::{ActiveGameData, BingoLine, MapCell},
     gamemap::GameMap,
     gameteam::{GameTeam, TeamIdentifier},
     rest::auth::PlayerIdentity,
+    util::color::RgbColor,
 };
-
-pub type PlayerIdentifier = generational_arena::Index;
-pub type PlayerRef = (RoomIdentifier, PlayerIdentifier);
 
 pub struct GameRoom {
     config: RoomConfiguration,
     join_code: String,
-    members: Arena<PlayerData>,
+    members: Vec<PlayerData>,
     teams: Vec<GameTeam>,
     maps: Vec<GameMap>,
     active: Option<ActiveGameData>,
@@ -32,7 +28,7 @@ impl GameRoom {
         Self {
             config: config,
             join_code,
-            members: Arena::new(),
+            members: Vec::new(),
             teams: Vec::new(),
             maps: Vec::new(),
             active: None,
@@ -49,10 +45,6 @@ impl GameRoom {
 
     pub fn config(&self) -> &RoomConfiguration {
         &self.config
-    }
-
-    pub fn channel(&self) -> ChannelAddress {
-        self.channel.clone()
     }
 
     pub fn maps(&self) -> &Vec<GameMap> {
@@ -84,10 +76,7 @@ impl GameRoom {
     }
 
     pub fn players(&self) -> Vec<NetworkPlayer> {
-        self.members
-            .iter()
-            .map(|(_, player)| NetworkPlayer::from(player))
-            .collect()
+        self.members.iter().map(NetworkPlayer::from).collect()
     }
 
     pub fn teams(&self) -> Vec<GameTeam> {
@@ -101,8 +90,8 @@ impl GameRoom {
         }
     }
 
-    pub fn get_player(&self, player: PlayerIdentifier) -> Option<&PlayerData> {
-        self.members.get(player)
+    pub fn get_player(&self, identity: PlayerIdentity) -> Option<&PlayerData> {
+        self.members.iter().find(|p| p.identity == identity)
     }
 
     pub fn get_team(&self, player: TeamIdentifier) -> Option<&GameTeam> {
@@ -112,19 +101,19 @@ impl GameRoom {
     pub fn create_team(&mut self) -> Option<&GameTeam> {
         let team_count = self.teams.len();
         if team_count >= TEAMS.len() {
-            // FIXME avoiding panic here
-            // panic!("attempted to create more than {} teams", TEAMS.len());
             warn!("attempted to create more than {} teams", TEAMS.len());
             return None;
         }
 
         let mut rng = rand::thread_rng();
         let mut idx = rng.gen_range(0..TEAMS.len());
-        while self.team_exsits_with_index(idx) {
+        while self.team_exsits_with_name(TEAMS[idx].0) {
             idx = rng.gen_range(0..TEAMS.len());
         }
 
-        self.teams.push(GameTeam::new(team_count, idx, channel));
+        let color = RgbColor::from_hex(TEAMS[idx].1).ok()?;
+        self.teams
+            .push(GameTeam::new(team_count, TEAMS[idx].0.to_owned(), color));
         self.teams.last()
     }
 
@@ -132,11 +121,11 @@ impl GameRoom {
         self.teams.iter().any(|t| t.id == id)
     }
 
-    fn team_exsits_with_index(&self, idx: usize) -> bool {
-        self.teams.iter().any(|t| t.gen_index == idx)
+    fn team_exsits_with_name(&self, name: &str) -> bool {
+        self.teams.iter().any(|t| t.name == name)
     }
 
-    fn add_player(&mut self, client: &GameClient, operator: bool) -> PlayerIdentifier {
+    fn add_player(&mut self, identity: &PlayerIdentity, operator: bool) -> PlayerIdentifier {
         let team = if !self.config.randomize {
             Some(0) // TODO: sort players in teams upon join
         } else {

@@ -8,8 +8,6 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tracing::{debug, error};
 
 use crate::config;
-use crate::gameroom::PlayerRef;
-use crate::rest::auth::PlayerIdentity;
 
 pub type SocketReader = UnboundedReceiver<String>;
 pub type SocketWriter = UnboundedSender<SocketAction>;

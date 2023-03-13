@@ -33,8 +33,8 @@ pub async fn read_handshake(
         return Err(HandshakeCode::IncompatibleVersion);
     }
 
-    if false {
-        // TODO: auth disabled
+    if config::AUTHENTICATION_API_SECRET.is_none() {
+        // Auth disabled
         return Ok(PlayerIdentity {
             account_id: handshake.username.clone(),
             display_name: handshake.username,

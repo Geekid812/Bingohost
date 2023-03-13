@@ -17,7 +17,7 @@ pub type RoomsLock<'a> = MutexGuard<'a, Lazy<HashMap<String, OwnedRoom>>>;
 pub type OwnedRoom = Arc<Mutex<GameRoom>>;
 pub type SharedRoom = Weak<Mutex<GameRoom>>;
 
-pub fn create_room<'a>(config: RoomConfiguration) -> OwnedRoom {
+pub fn create_room<'a>(config: RoomConfiguration) -> (OwnedRoom, GameRoom) {
     let lock = ROOMS.lock();
     let mut join_code = generate_roomcode();
 
@@ -27,7 +27,7 @@ pub fn create_room<'a>(config: RoomConfiguration) -> OwnedRoom {
 
     let room = Arc::new(Mutex::new(GameRoom::create(config, join_code)));
     lock.insert(join_code, room.clone());
-    room
+    (room, *room.lock())
 }
 
 pub fn find_room(join_code: String) -> Option<OwnedRoom> {

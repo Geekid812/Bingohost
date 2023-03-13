@@ -1,101 +1,50 @@
 use generational_arena::Arena;
-use std::{
-    collections::HashMap,
-    io,
-    sync::{Arc, Mutex, RwLock},
-};
-use tracing::{debug, info};
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
+use std::sync::Weak;
+use tracing::debug;
 
-use crate::{
-    client::{ClientId, GameClient},
-    events::ServerEvent,
-    protocol::Protocol,
-};
+use crate::socket::{SocketAction, SocketWriter};
 
 pub type ChannelAddress = generational_arena::Index;
+static CHANNELS: Mutex<Lazy<Arena<Vec<Weak<SocketWriter>>>>> =
+    Mutex::new(Lazy::new(|| Arena::new()));
 
-pub struct Channel {
-    clients: Mutex<HashMap<ClientId, Arc<Protocol>>>,
-}
+pub struct Channel<'a>(&'a mut Vec<Weak<SocketWriter>>);
 
-impl Channel {
-    pub fn new() -> Self {
-        Self {
-            clients: Mutex::new(HashMap::new()),
-        }
+impl<'a> Channel<'a> {
+    pub fn subscribe(&mut self, target: Weak<SocketWriter>) {
+        self.0.push(target)
     }
 
-    pub fn subscribe(&self, id: ClientId, client: Arc<Protocol>) {
-        self.clients
-            .lock()
-            .expect("lock poisoned")
-            .insert(id, client);
-    }
-
-    pub fn remove(&self, id: ClientId) {
-        self.clients.lock().expect("lock poisoned").remove(&id);
+    pub fn cleanup(&mut self) {
+        let cleaned = self
+            .0
+            .iter()
+            .filter(|writer| writer.strong_count() > 0)
+            .map(Weak::clone)
+            .collect();
+        *self.0 = cleaned;
     }
 
     pub fn broadcast(&self, message: String) {
-        debug!("Broadcasting: {}", message);
-
-        let msg = Arc::new(message);
-        for client in self.clients.lock().expect("lock poisoned").values() {
-            tokio::spawn(Channel::send(client.clone(), msg.clone()));
-        }
-    }
-
-    async fn send(protocol: Arc<Protocol>, msg: Arc<String>) {
-        match protocol.send(&msg).await {
-            Ok(_) => (),
-            Err(e) => {
-                if e.kind() != io::ErrorKind::NotConnected {
-                    protocol.error(&e.to_string()).await
-                };
-            }
-        };
+        debug!("broadcasting: {}", message);
+        self.0.iter().for_each(|writer| {
+            writer
+                .upgrade()
+                .map(|sender| sender.send(SocketAction::Message(message)));
+        });
     }
 }
 
-pub struct ChannelCollection {
-    arena: RwLock<Arena<Channel>>,
+pub fn new() -> ChannelAddress {
+    CHANNELS.lock().insert(Vec::new())
 }
 
-impl ChannelCollection {
-    pub fn new() -> Self {
-        Self {
-            arena: RwLock::new(Arena::new()),
-        }
-    }
+pub fn get<'a>(address: ChannelAddress) -> Option<Channel<'a>> {
+    CHANNELS.lock().get_mut(address).map(|c| Channel(c))
+}
 
-    pub fn create_one(&self) -> ChannelAddress {
-        let channel = Channel::new();
-        self.arena.write().expect("lock poisoned").insert(channel)
-    }
-
-    pub fn subscribe(&self, address: ChannelAddress, client: &GameClient) {
-        if let Some(channel) = self.arena.read().expect("lock poisioned").get(address) {
-            channel.subscribe(client.get_id(), client.get_protocol());
-        }
-    }
-
-    pub fn unsubscribe(&self, address: ChannelAddress, client: ClientId) {
-        if let Some(channel) = self.arena.read().expect("lock poisioned").get(address) {
-            channel.remove(client);
-        }
-    }
-
-    pub fn broadcast(&self, address: ChannelAddress, event: ServerEvent) {
-        let message = serde_json::to_string(&event).expect("event serialization");
-        self.arena
-            .read()
-            .expect("lock poisoned")
-            .get(address)
-            .expect("broadcasting in a channel that exists")
-            .broadcast(message)
-    }
-
-    pub fn remove(&self, address: ChannelAddress) {
-        self.arena.write().expect("lock poisioned").remove(address);
-    }
+pub fn remove(address: ChannelAddress) -> bool {
+    CHANNELS.lock().remove(address).is_some()
 }

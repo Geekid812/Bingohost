@@ -33,7 +33,7 @@ pub async fn run_loop(
 
         // Match a request
         if let Ok(incoming) = serde_json::from_str::<BaseRequest>(&msg) {
-            let response = incoming.request.handle(&identity, &mut ctx);
+            let response = incoming.request.handle(&mut ctx);
             let outgoing = incoming.build_reply(response);
             let res_text = serde_json::to_string(&outgoing).expect("response serialization failed");
             debug!("response: {}", &res_text);

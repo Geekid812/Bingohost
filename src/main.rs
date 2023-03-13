@@ -3,7 +3,7 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 use tokio::net::TcpSocket;
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::FmtSubscriber;
 
 pub mod channel;
@@ -47,6 +47,9 @@ async fn main() {
             .expect("authentification route to be valid"),
     );
     let auth_arc = Arc::new(authenticator);
+    if config::AUTHENTICATION_API_SECRET.is_none() {
+        info!("Openplanet authentification is disabled. This is intended to be used only on unofficial servers!");
+    }
 
     // Socket creation
     let socket = TcpSocket::new_v4().expect("ipv4 socket to be created");

@@ -5,8 +5,7 @@ pub mod generic;
 
 #[typetag::deserialize(tag = "req")]
 pub trait Request {
-    fn handle(&self, identity: &PlayerIdentity, ctx: &mut Option<GameContext>)
-        -> Box<dyn Response>;
+    fn handle(&self, ctx: &mut Option<GameContext>) -> Box<dyn Response>;
 }
 
 #[typetag::serialize(tag = "res")]

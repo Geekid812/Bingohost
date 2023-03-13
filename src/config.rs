@@ -48,7 +48,7 @@ mod live {
 #[cfg(feature = "live")]
 pub use live::*;
 
-pub const AUTHENTICATION_API_SECRET: &'static str = env!("AUTH_SECRET");
+pub const AUTHENTICATION_API_SECRET: Option<&'static str> = option_env!("AUTH_SECRET");
 pub const TMX_USERAGENT: &'static str = env!("TMX_USERAGENT");
 
 pub const TEAMS: [(&'static str, &'static str); 6] = [
