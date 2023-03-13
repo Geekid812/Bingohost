@@ -5,11 +5,20 @@ use crate::{rest::auth::PlayerIdentity, roomlist::SharedRoom, socket::SocketWrit
 pub struct ClientContext {
     pub game: Option<GameContext>,
     pub identity: PlayerIdentity,
+    pub writer: Arc<SocketWriter>,
 }
 
 impl ClientContext {
-    pub fn new(identity: PlayerIdentity, game: Option<GameContext>) -> Self {
-        Self { game, identity }
+    pub fn new(
+        identity: PlayerIdentity,
+        game: Option<GameContext>,
+        writer: Arc<SocketWriter>,
+    ) -> Self {
+        Self {
+            game,
+            identity,
+            writer,
+        }
     }
 }
 

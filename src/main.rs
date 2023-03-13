@@ -3,7 +3,7 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 use tokio::net::TcpSocket;
-use tracing::{info, warn};
+use tracing::info;
 use tracing_subscriber::FmtSubscriber;
 
 use crate::context::ClientContext;
@@ -85,7 +85,7 @@ async fn main() {
                         can_reconnect: ctx.is_some(),
                     };
                     handshake::accept_socket(writer, data);
-                    Some(ClientContext::new(identity, ctx))
+                    Some(ClientContext::new(identity, ctx, Arc::new(writer)))
                 }
                 Err(code) => {
                     handshake::deny_socket(writer, code);
@@ -96,7 +96,7 @@ async fn main() {
             if ctx.is_none() {
                 return;
             }
-            client::run_loop(ctx.unwrap(), reader, writer);
+            client::run_loop(ctx.unwrap(), reader);
         });
     }
 }

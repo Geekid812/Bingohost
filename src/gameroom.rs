@@ -5,8 +5,10 @@ use thiserror::Error;
 use tracing::warn;
 
 use crate::{
+    channel::Channel,
     client::GameClient,
     config::TEAMS,
+    context::{ClientContext, GameContext},
     gamedata::{ActiveGameData, BingoLine, MapCell},
     gamemap::GameMap,
     gameteam::{GameTeam, TeamIdentifier},
@@ -21,6 +23,7 @@ pub struct GameRoom {
     teams: Vec<GameTeam>,
     maps: Vec<GameMap>,
     active: Option<ActiveGameData>,
+    channel: Channel,
 }
 
 impl GameRoom {
@@ -32,6 +35,7 @@ impl GameRoom {
             teams: Vec::new(),
             maps: Vec::new(),
             active: None,
+            channel: Channel::new(),
         }
     }
 
@@ -57,6 +61,10 @@ impl GameRoom {
 
     pub fn has_started(&self) -> bool {
         self.active.is_some()
+    }
+
+    pub fn channel(&mut self) -> &mut Channel {
+        &mut self.channel
     }
 
     pub fn add_maps(&mut self, maps: Vec<GameMap>) {
@@ -129,52 +137,55 @@ impl GameRoom {
         self.teams.iter().any(|t| t.name == name)
     }
 
-    fn add_player(&mut self, identity: &PlayerIdentity, operator: bool) -> PlayerIdentifier {
+    fn add_player(&mut self, identity: &PlayerIdentity, operator: bool) {
         let team = if !self.config.randomize {
             Some(0) // TODO: sort players in teams upon join
         } else {
             None
         };
-        self.members.insert(PlayerData {
-            identity: client.identity().clone(),
+        self.members.push(PlayerData {
+            identity: identity.clone(),
             team,
             operator,
-            disconnected: false,
-        })
-    }
-
-    pub fn identify_player(&self, identity: &PlayerIdentity) -> Option<PlayerIdentifier> {
-        self.members
-            .iter()
-            .filter(|(_, p)| &p.identity == identity)
-            .next()
-            .map(|(id, _)| id)
+            disconnected: false, // TODO: is this accurate?
+        });
     }
 
     pub fn player_join(
         &mut self,
-        client: &GameClient,
+        identity: &PlayerIdentity,
         operator: bool,
-    ) -> Result<PlayerIdentifier, JoinRoomError> {
+    ) -> Result<(), JoinRoomError> {
         if self.has_started() {
             return Err(JoinRoomError::HasStarted);
         }
         if self.config.size != 0 && self.members.len() as u32 >= self.config.size {
             return Err(JoinRoomError::PlayerLimitReached);
         }
-        Ok(self.add_player(client, operator))
+        Ok(self.add_player(identity, operator))
     }
 
     // Returns: whether the room should be closed
-    pub fn player_remove(&mut self, player: PlayerIdentifier) -> bool {
-        self.members.remove(player).map_or(false, |p| p.operator)
+    pub fn player_remove(&mut self, identity: &PlayerIdentity) -> bool {
+        for i in 0..self.members.len() {
+            if &self.members[i].identity == identity {
+                self.members.remove(i);
+                break;
+            }
+        }
+        return self.members.iter().any(|m| m.operator);
     }
 
-    pub fn change_team(&mut self, player: PlayerIdentifier, team: TeamIdentifier) {
+    pub fn change_team(&mut self, identity: &PlayerIdentity, team: TeamIdentifier) {
         if !self.team_exsits(team) {
             return;
         }
-        if let Some(data) = self.members.get_mut(player) {
+        if let Some(data) = self
+            .members
+            .iter_mut()
+            .filter(|m| &m.identity == identity)
+            .next()
+        {
             data.team = Some(team);
         }
     }

@@ -12,11 +12,7 @@ pub struct GameClient {
     writer: SocketWriter,
 }
 
-pub async fn run_loop(
-    mut ctx: ClientContext,
-    mut reader: SocketReader,
-    writer: SocketWriter,
-) -> LoopExit {
+pub async fn run_loop(mut ctx: ClientContext, mut reader: SocketReader) -> LoopExit {
     loop {
         let data = reader.recv().await;
         if data.is_none() {
@@ -36,7 +32,7 @@ pub async fn run_loop(
             let outgoing = incoming.build_reply(response);
             let res_text = serde_json::to_string(&outgoing).expect("response serialization failed");
             debug!("response: {}", &res_text);
-            let sent = writer.send(SocketAction::Message(res_text));
+            let sent = ctx.writer.send(SocketAction::Message(res_text));
         } else {
             // Match an event
             // match serde_json::from_str::<ClientEvent>(&msg) {

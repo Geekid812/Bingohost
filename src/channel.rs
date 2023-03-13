@@ -2,12 +2,16 @@ use tracing::debug;
 
 use crate::{socket::SocketAction, util::sink::WriteSink};
 
-pub type ChannelAddress = generational_arena::Index;
+// pub type ChannelAddress = generational_arena::Index;
 // static CHANNELS: Mutex<Lazy<Arena<Vec<WriteSink>>>> = Mutex::new(Lazy::new(|| Arena::new()));
 
 pub struct Channel(Vec<WriteSink>);
 
 impl Channel {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
     pub fn subscribe(&mut self, target: WriteSink) {
         self.0.push(target)
     }
