@@ -1,11 +1,21 @@
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use crate::{rest::auth::PlayerIdentity, roomlist::SharedRoom, socket::SocketWriter};
 
+pub struct ClientContext {
+    pub game: Option<GameContext>,
+    pub identity: PlayerIdentity,
+}
+
+impl ClientContext {
+    pub fn new(identity: PlayerIdentity, game: Option<GameContext>) -> Self {
+        Self { game, identity }
+    }
+}
+
 pub struct GameContext {
     room: SharedRoom,
-    identity: PlayerIdentity,
-    inbox: Arc<SocketWriter>,
+    writer: Arc<Weak<SocketWriter>>,
 }
 
 impl GameContext {

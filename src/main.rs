@@ -6,6 +6,8 @@ use tokio::net::TcpSocket;
 use tracing::{info, warn};
 use tracing_subscriber::FmtSubscriber;
 
+use crate::context::ClientContext;
+
 pub mod channel;
 pub mod client;
 pub mod config;
@@ -75,7 +77,7 @@ async fn main() {
         let auth = auth_arc.clone();
         tokio::spawn(async move {
             let (writer, reader) = socket::spawn(incoming);
-            let (identity, ctx) = match handshake::read_handshake(&mut reader, auth).await {
+            let ctx = match handshake::read_handshake(&mut reader, auth).await {
                 Ok(identity) => {
                     let ctx = reconnect::recover(&identity);
                     let data = handshake::HandshakeSuccess {
@@ -83,18 +85,18 @@ async fn main() {
                         can_reconnect: ctx.is_some(),
                     };
                     handshake::accept_socket(writer, data);
-                    (Some(identity), ctx)
+                    Some(ClientContext::new(identity, ctx))
                 }
                 Err(code) => {
                     handshake::deny_socket(writer, code);
-                    (None, None)
+                    None
                 }
             };
 
-            if identity.is_none() {
+            if ctx.is_none() {
                 return;
             }
-            client::run_loop(identity.unwrap(), ctx, reader, writer);
+            client::run_loop(ctx.unwrap(), reader, writer);
         });
     }
 }

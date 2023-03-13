@@ -1,6 +1,6 @@
 use tracing::debug;
 
-use crate::context::GameContext;
+use crate::context::{ClientContext, GameContext};
 use crate::requests::BaseRequest;
 use crate::rest::auth::PlayerIdentity;
 use crate::socket::{SocketAction, SocketReader, SocketWriter};
@@ -13,8 +13,7 @@ pub struct GameClient {
 }
 
 pub async fn run_loop(
-    identity: PlayerIdentity,
-    mut ctx: Option<GameContext>,
+    mut ctx: ClientContext,
     mut reader: SocketReader,
     writer: SocketWriter,
 ) -> LoopExit {
@@ -22,8 +21,8 @@ pub async fn run_loop(
         let data = reader.recv().await;
         if data.is_none() {
             // Client disconnected
-            return if let Some(ctx) = ctx {
-                LoopExit::Linger(identity, ctx)
+            return if let Some(game_ctx) = ctx.game {
+                LoopExit::Linger(ctx.identity, game_ctx)
             } else {
                 LoopExit::Close
             };

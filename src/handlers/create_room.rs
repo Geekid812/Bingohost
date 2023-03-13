@@ -1,11 +1,16 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    client::GameClient, config::TEAMS, context::GameContext, gamecommon::setup_room,
-    gameroom::RoomConfiguration, gameteam::GameTeam, rest::auth::PlayerIdentity, roomlist,
+    client::GameClient,
+    config::TEAMS,
+    context::{ClientContext, GameContext},
+    gamecommon::setup_room,
+    gameroom::RoomConfiguration,
+    gameteam::GameTeam,
+    roomlist,
 };
 
-use super::{generic::Ok, Request, Response};
+use super::{Request, Response};
 
 #[derive(Deserialize)]
 pub struct CreateRoom(RoomConfiguration);
@@ -20,7 +25,7 @@ pub struct CreateRoomResponse {
 
 #[typetag::deserialize]
 impl Request for CreateRoom {
-    fn handle(&self, ctx: &mut Option<GameContext>) -> Box<dyn Response> {
+    fn handle(&self, ctx: &mut ClientContext) -> Box<dyn Response> {
         let (lock, room) = roomlist::create_room(self.0.clone());
 
         setup_room(&mut room);

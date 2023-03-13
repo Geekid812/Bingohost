@@ -63,6 +63,10 @@ impl GameRoom {
         self.maps.extend(maps);
     }
 
+    pub fn set_maps(&mut self, maps: Vec<GameMap>) {
+        self.maps = maps;
+    }
+
     pub fn remove_maps(&mut self, count: usize) -> Vec<GameMap> {
         if count > self.maps.len() {
             self.remove_all_maps()
