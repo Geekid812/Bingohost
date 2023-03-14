@@ -30,6 +30,7 @@ pub async fn run_loop(mut ctx: ClientContext, mut reader: SocketReader) -> LoopE
                 return LoopExit::Close; // Explicit disconnect
             }
         } else {
+            debug!("{:?}", serde_json::from_str::<BaseRequest>(&msg));
             // Match an event
             // match serde_json::from_str::<ClientEvent>(&msg) {
             //     Ok(event) => self.handle_event(&event).await,

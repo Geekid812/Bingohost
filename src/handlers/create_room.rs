@@ -11,10 +11,10 @@ use crate::{
 
 use super::{Request, Response};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct CreateRoom(RoomConfiguration);
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct CreateRoomResponse {
     pub name: String,
     pub join_code: String,

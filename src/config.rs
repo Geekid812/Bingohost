@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::util::version::Version;
 use tracing::Level;
 
-pub const LOG_LEVEL: Level = Level::INFO;
+pub const LOG_LEVEL: Level = Level::DEBUG;
 pub const TCP_LISTENING_PORT: u16 = 8040;
 pub const MINIMUM_CLIENT_VERSION: Version = Version(4, 0);
 

@@ -7,7 +7,7 @@ use crate::{
     sync::SyncPacket,
 };
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct BaseRequest {
     #[serde(rename = "seq")]
     sequence: u32,
@@ -24,7 +24,7 @@ impl BaseRequest {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct BaseResponse {
     #[serde(rename = "seq")]
     sequence: u32,

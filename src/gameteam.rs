@@ -4,7 +4,7 @@ use crate::util::color::RgbColor;
 
 pub type TeamIdentifier = usize;
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Debug)]
 pub struct GameTeam {
     pub id: TeamIdentifier,
     pub name: String,

@@ -259,7 +259,7 @@ impl From<&PlayerData> for NetworkPlayer {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RoomConfiguration {
     // Room Settings
     pub name: String,
