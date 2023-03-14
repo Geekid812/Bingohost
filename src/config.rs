@@ -4,8 +4,8 @@ use crate::util::version::Version;
 use tracing::Level;
 
 pub const LOG_LEVEL: Level = Level::INFO;
-pub const TCP_LISTENING_PORT: u16 = 6600;
-pub const MINIMUM_CLIENT_VERSION: Version = Version(3, 0);
+pub const TCP_LISTENING_PORT: u16 = 8040;
+pub const MINIMUM_CLIENT_VERSION: Version = Version(4, 0);
 
 pub const MAP_QUEUE_SIZE: usize = 10;
 pub const MAP_QUEUE_CAPACITY: usize = 30;
