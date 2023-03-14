@@ -3,50 +3,13 @@ use std::time::Duration;
 use crate::util::version::Version;
 use tracing::Level;
 
-#[cfg(not(any(feature = "preview", feature = "live")))]
-mod default {
-    use super::*;
+pub const LOG_LEVEL: Level = Level::INFO;
+pub const TCP_LISTENING_PORT: u16 = 6600;
+pub const MINIMUM_CLIENT_VERSION: Version = Version(3, 0);
 
-    pub const LOG_LEVEL: Level = Level::INFO;
-    pub const TCP_LISTENING_PORT: u16 = 6600;
-    pub const MINIMUM_CLIENT_VERSION: Version = Version(3, 0);
-
-    pub const MAP_QUEUE_SIZE: usize = 10;
-    pub const MAP_QUEUE_CAPACITY: usize = 30;
-    pub const TMX_FETCH_TIMEOUT: Duration = Duration::from_secs(20);
-}
-#[cfg(not(any(feature = "preview", feature = "live")))]
-pub use default::*;
-
-#[cfg(feature = "preview")]
-mod preview {
-    use super::*;
-
-    pub const LOG_LEVEL: Level = Level::INFO;
-    pub const TCP_LISTENING_PORT: u16 = 6699;
-    pub const MINIMUM_CLIENT_VERSION: Version = Version(3, 0);
-
-    pub const MAP_QUEUE_SIZE: usize = 100;
-    pub const MAP_QUEUE_CAPACITY: usize = 200;
-    pub const TMX_FETCH_TIMEOUT: Duration = Duration::from_secs(20);
-}
-#[cfg(feature = "preview")]
-pub use preview::*;
-
-#[cfg(feature = "live")]
-mod live {
-    use super::*;
-
-    pub const LOG_LEVEL: Level = Level::INFO;
-    pub const TCP_LISTENING_PORT: u16 = 6900;
-    pub const MINIMUM_CLIENT_VERSION: Version = Version(3, 0);
-
-    pub const MAP_QUEUE_SIZE: usize = 100;
-    pub const MAP_QUEUE_CAPACITY: usize = 200;
-    pub const TMX_FETCH_TIMEOUT: Duration = Duration::from_secs(20);
-}
-#[cfg(feature = "live")]
-pub use live::*;
+pub const MAP_QUEUE_SIZE: usize = 10;
+pub const MAP_QUEUE_CAPACITY: usize = 30;
+pub const TMX_FETCH_TIMEOUT: Duration = Duration::from_secs(20);
 
 pub const AUTHENTICATION_API_SECRET: Option<&'static str> = option_env!("AUTH_SECRET");
 pub const TMX_USERAGENT: &'static str = env!("TMX_USERAGENT");
