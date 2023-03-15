@@ -9,7 +9,9 @@ pub struct Ok;
 impl Response for Ok {}
 
 #[derive(Serialize, Debug)]
-pub struct Error(String);
+pub struct Error {
+    pub error: String,
+}
 
 #[typetag::serialize]
 impl Response for Error {}

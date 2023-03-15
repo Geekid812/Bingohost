@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -7,6 +9,7 @@ use crate::{
     gameroom::RoomConfiguration,
     gameteam::GameTeam,
     roomlist,
+    util::sink::WriteSink,
 };
 
 use super::{Request, Response};
@@ -25,7 +28,8 @@ pub struct CreateRoomResponse {
 #[typetag::deserialize]
 impl Request for CreateRoom {
     fn handle(&self, ctx: &mut ClientContext) -> Box<dyn Response> {
-        if let Some(room) = ctx.game.as_mut().and_then(|game_ctx| game_ctx.room()) {
+        if let Some(room) = ctx.game_room() {
+            ctx.trace("already in a room, leaving previous game");
             room.lock().player_remove(&ctx.identity);
             // TODO: on player removed?
         }
@@ -33,7 +37,11 @@ impl Request for CreateRoom {
         let mut room = room_arc.lock();
 
         setup_room(&mut room);
-        ctx.game = Some(GameContext::new(&ctx, &room_arc));
+        room.add_player(&ctx.identity, true);
+        let game_ctx = GameContext::new(&ctx, &room_arc);
+        room.channel()
+            .subscribe(WriteSink::Double(Arc::downgrade(&game_ctx.writer)));
+        ctx.game = Some(game_ctx);
         Box::new(CreateRoomResponse {
             name: room.name().to_owned(),
             join_code: room.join_code().to_owned(),

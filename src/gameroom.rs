@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -7,6 +8,7 @@ use tracing::warn;
 use crate::{
     channel::Channel,
     config::TEAMS,
+    events::ServerEvent,
     gamedata::{ActiveGameData, BingoLine, MapCell},
     gamemap::GameMap,
     gameteam::{GameTeam, TeamIdentifier},
@@ -22,6 +24,7 @@ pub struct GameRoom {
     maps: Vec<GameMap>,
     active: Option<ActiveGameData>,
     channel: Channel,
+    created: DateTime<Utc>,
 }
 
 impl GameRoom {
@@ -34,6 +37,7 @@ impl GameRoom {
             maps: Vec::new(),
             active: None,
             channel: Channel::new(),
+            created: Utc::now(),
         }
     }
 
@@ -63,6 +67,10 @@ impl GameRoom {
 
     pub fn channel(&mut self) -> &mut Channel {
         &mut self.channel
+    }
+
+    pub fn created(&self) -> &DateTime<Utc> {
+        &self.created
     }
 
     pub fn add_maps(&mut self, maps: Vec<GameMap>) {
@@ -100,6 +108,13 @@ impl GameRoom {
         }
     }
 
+    pub fn host_name(&self) -> Option<String> {
+        self.members
+            .iter()
+            .find(|p| p.operator)
+            .map(|p| p.identity.display_name.clone())
+    }
+
     pub fn get_player(&self, identity: PlayerIdentity) -> Option<&PlayerData> {
         self.members.iter().find(|p| p.identity == identity)
     }
@@ -135,7 +150,7 @@ impl GameRoom {
         self.teams.iter().any(|t| t.name == name)
     }
 
-    fn add_player(&mut self, identity: &PlayerIdentity, operator: bool) {
+    pub fn add_player(&mut self, identity: &PlayerIdentity, operator: bool) {
         let team = if !self.config.randomize {
             Some(0) // TODO: sort players in teams upon join
         } else {
@@ -174,9 +189,9 @@ impl GameRoom {
         return self.members.iter().any(|m| m.operator);
     }
 
-    pub fn change_team(&mut self, identity: &PlayerIdentity, team: TeamIdentifier) {
+    pub fn change_team(&mut self, identity: &PlayerIdentity, team: TeamIdentifier) -> bool {
         if !self.team_exsits(team) {
-            return;
+            return false;
         }
         if let Some(data) = self
             .members
@@ -186,6 +201,7 @@ impl GameRoom {
         {
             data.team = Some(team);
         }
+        true
     }
 
     pub fn set_config(&mut self, config: RoomConfiguration) {
@@ -218,6 +234,13 @@ impl GameRoom {
         self.active.as_ref().map_or(Vec::new(), |a| {
             a.check_for_bingos(self.config.grid_size.into())
         })
+    }
+
+    pub fn room_update(&self) {
+        self.channel.broadcast(
+            serde_json::to_string(&ServerEvent::RoomUpdate(self.status()))
+                .expect("server event serialization does not error"),
+        );
     }
 }
 
@@ -263,9 +286,7 @@ impl From<&PlayerData> for NetworkPlayer {
 pub struct RoomConfiguration {
     // Room Settings
     pub name: String,
-    pub visibility: RoomVisibility,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub password: Option<String>,
+    pub public: bool,
     pub size: u32,
     pub randomize: bool,
     pub chat_enabled: bool,
@@ -276,13 +297,6 @@ pub struct RoomConfiguration {
     pub time_limit: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mappack_id: Option<u32>,
-}
-
-#[derive(Clone, Copy, Debug, Serialize_repr, Deserialize_repr, PartialEq, Eq)]
-#[repr(u8)]
-pub enum RoomVisibility {
-    Public,
-    Private,
 }
 
 #[derive(Clone, Copy, Debug, Serialize_repr, Deserialize_repr, PartialEq, Eq)]

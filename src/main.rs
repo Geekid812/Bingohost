@@ -27,6 +27,7 @@ pub mod roomlist;
 pub mod socket;
 pub mod sync;
 pub mod util;
+mod web;
 
 pub static CLIENT_COUNT: AtomicU32 = AtomicU32::new(0);
 
@@ -38,6 +39,9 @@ async fn main() {
         .finish();
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber");
+
+    // Start web dashboard
+    tokio::spawn(web::main());
 
     // Auth setup
     use config::routes::openplanet as route;

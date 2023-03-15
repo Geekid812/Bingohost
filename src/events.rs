@@ -1,16 +1,10 @@
+use serde::Serialize;
+
 use crate::{
     gamedata::{BingoLine, MapClaim},
     gamemap::GameMap,
     gameroom::{RoomConfiguration, RoomStatus},
 };
-use serde::{Deserialize, Serialize};
-
-#[derive(Deserialize)]
-#[serde(tag = "event")]
-pub enum ClientEvent {
-    ChangeTeam { team_id: usize },
-    LeaveRoom,
-}
 
 #[derive(Serialize)]
 #[serde(tag = "event")]

@@ -3,7 +3,7 @@ use std::sync::{Arc, Weak};
 use crate::{
     rest::auth::PlayerIdentity,
     roomlist::{OwnedRoom, SharedRoom},
-    socket::SocketWriter,
+    socket::{SocketAction, SocketWriter},
 };
 
 pub struct ClientContext {
@@ -24,11 +24,24 @@ impl ClientContext {
             writer,
         }
     }
+
+    pub fn game_room(&mut self) -> Option<OwnedRoom> {
+        self.game.as_mut().and_then(|gamectx| gamectx.room())
+    }
+
+    pub fn trace<M: Into<String>>(&self, message: M) {
+        if let Ok(text) = serde_json::to_string(&message.into()) {
+            drop(self.writer.send(SocketAction::Message(format!(
+                "{{\"event\":\"Trace\",\"value\":{}}}",
+                text
+            ))));
+        }
+    }
 }
 
 pub struct GameContext {
     room: SharedRoom,
-    writer: Arc<Weak<SocketWriter>>,
+    pub writer: Arc<Weak<SocketWriter>>,
 }
 
 impl GameContext {

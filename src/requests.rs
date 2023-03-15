@@ -1,11 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    gameroom::{Medal, RoomConfiguration, RoomStatus},
-    gameteam::GameTeam,
-    handlers::{Request, Response},
-    sync::SyncPacket,
-};
+use crate::handlers::{Request, Response};
 
 #[derive(Deserialize, Debug)]
 pub struct BaseRequest {
@@ -69,17 +64,3 @@ pub struct BaseResponse {
 //     },
 //     Sync(SyncPacket),
 // }
-
-#[derive(Deserialize)]
-pub struct CreateRoomRequest {
-    #[serde(flatten)]
-    pub config: RoomConfiguration,
-}
-
-#[derive(Serialize)]
-pub struct CreateRoomResponse {
-    pub name: String,
-    pub join_code: String,
-    pub max_teams: usize,
-    pub teams: Vec<GameTeam>,
-}

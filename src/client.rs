@@ -1,6 +1,7 @@
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::context::{ClientContext, GameContext};
+use crate::handlers::ClientEvent;
 use crate::requests::BaseRequest;
 use crate::rest::auth::PlayerIdentity;
 use crate::socket::{SocketAction, SocketReader};
@@ -30,12 +31,11 @@ pub async fn run_loop(mut ctx: ClientContext, mut reader: SocketReader) -> LoopE
                 return LoopExit::Close; // Explicit disconnect
             }
         } else {
-            debug!("{:?}", serde_json::from_str::<BaseRequest>(&msg));
             // Match an event
-            // match serde_json::from_str::<ClientEvent>(&msg) {
-            //     Ok(event) => self.handle_event(&event).await,
-            //     Err(e) => self.protocol.error(&e.to_string()).await,
-            // };
+            match serde_json::from_str::<Box<dyn ClientEvent>>(&msg) {
+                Ok(event) => event.handle(&mut ctx),
+                Err(e) => warn!("parse error: {:?}", e),
+            };
         }
     }
 }

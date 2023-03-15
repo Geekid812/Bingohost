@@ -2,9 +2,10 @@ use std::fmt::Debug;
 
 use crate::context::ClientContext;
 
-pub mod create_room;
-pub mod generic;
-pub mod ping;
+mod change_team;
+mod create_room;
+mod generic;
+mod ping;
 
 #[typetag::deserialize(tag = "req")]
 pub trait Request: Debug {
@@ -13,3 +14,8 @@ pub trait Request: Debug {
 
 #[typetag::serialize(tag = "res")]
 pub trait Response: Debug {}
+
+#[typetag::deserialize(tag = "event")]
+pub trait ClientEvent: Debug {
+    fn handle(&self, ctx: &mut ClientContext);
+}

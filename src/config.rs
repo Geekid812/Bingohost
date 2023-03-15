@@ -13,6 +13,7 @@ pub const TMX_FETCH_TIMEOUT: Duration = Duration::from_secs(20);
 
 pub const AUTHENTICATION_API_SECRET: Option<&'static str> = option_env!("AUTH_SECRET");
 pub const TMX_USERAGENT: &'static str = env!("TMX_USERAGENT");
+pub const ADMIN_KEY: Option<&'static str> = option_env!("ADMIN_KEY");
 
 pub const TEAMS: [(&'static str, &'static str); 6] = [
     ("Red", "F81315"),

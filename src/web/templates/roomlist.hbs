@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+    <link rel="stylesheet" href="./static/milligram.min.css">
+    <link rel="stylesheet" href="./static/main.css">
+    <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Inter:300">
+</head>
+
+<body>
+    <main>
+        <h1>Game Rooms</h1>
+        <h4>
+            {{public}} public rooms
+            <br>
+            {{private}} private rooms
+        </h4>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Visibility</th>
+                    <th>Host</th>
+                    <th>Join Code</th>
+                    <th>Players</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each rooms}}
+                <tr>
+                    <td>{{this.name}}</td>
+                    <td>
+                        {{#if this.config.public}}
+                        Public
+                        {{else}}
+                        Private
+                        {{/if}}
+                    </td>
+                    <td>{{this.host}}</td>
+                    <td>{{this.join_code}}</td>
+                    <td>{{this.player_count}}{{#if this.config.size}}/{{this.config.size}}{{/if}}</td>
+                    <td>{{strftime this.created "%H:%M"}}</td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </main>
+</body>
+
+</html>
