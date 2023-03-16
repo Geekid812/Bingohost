@@ -139,6 +139,7 @@ impl GameRoom {
         let color = RgbColor::from_hex(TEAMS[idx].1).ok()?;
         self.teams
             .push(GameTeam::new(team_count, TEAMS[idx].0.to_owned(), color));
+        self.room_update();
         self.teams.last()
     }
 
@@ -162,6 +163,7 @@ impl GameRoom {
             operator,
             disconnected: false, // TODO: is this accurate?
         });
+        self.room_update();
     }
 
     pub fn player_join(
@@ -186,6 +188,7 @@ impl GameRoom {
                 break;
             }
         }
+        self.room_update();
         return self.members.iter().any(|m| m.operator);
     }
 
@@ -201,11 +204,13 @@ impl GameRoom {
         {
             data.team = Some(team);
         }
+        self.room_update();
         true
     }
 
     pub fn set_config(&mut self, config: RoomConfiguration) {
-        self.config = config
+        self.config = config;
+        self.config_update();
     }
 
     pub fn set_started(&mut self, started: bool) {
@@ -239,6 +244,13 @@ impl GameRoom {
     pub fn room_update(&self) {
         self.channel.broadcast(
             serde_json::to_string(&ServerEvent::RoomUpdate(self.status()))
+                .expect("server event serialization does not error"),
+        );
+    }
+
+    pub fn config_update(&self) {
+        self.channel.broadcast(
+            serde_json::to_string(&ServerEvent::RoomConfigUpdate(self.config().clone()))
                 .expect("server event serialization does not error"),
         );
     }
