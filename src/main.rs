@@ -6,7 +6,7 @@ use tokio::net::TcpSocket;
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
 
-use crate::context::ClientContext;
+use crate::{client::LoopExit, context::ClientContext};
 
 pub mod channel;
 pub mod client;
@@ -100,7 +100,11 @@ async fn main() {
             if ctx.is_none() {
                 return;
             }
-            client::run_loop(ctx.unwrap(), reader).await;
+            let exit = client::run_loop(ctx.unwrap(), reader).await;
+
+            if let LoopExit::Linger(identity, game_ctx) = exit {
+                reconnect::add_lingering(&identity, game_ctx);
+            }
         });
     }
 }

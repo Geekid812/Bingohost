@@ -11,11 +11,12 @@ pub async fn run_loop(mut ctx: ClientContext, mut reader: SocketReader) -> LoopE
         let data = reader.recv().await;
         if data.is_none() {
             // Client disconnected
-            return if let Some(game_ctx) = ctx.game {
-                LoopExit::Linger(ctx.identity, game_ctx)
-            } else {
-                LoopExit::Close
-            };
+            if let Some(game_ctx) = ctx.game {
+                if game_ctx.room().map_or(false, |r| r.lock().has_started()) {
+                    return LoopExit::Linger(ctx.identity, game_ctx);
+                }
+            }
+            return LoopExit::Close;
         }
         let msg = data.unwrap();
         debug!("received: {}", msg);

@@ -254,6 +254,13 @@ impl GameRoom {
                 .expect("server event serialization does not error"),
         );
     }
+
+    pub fn close_room(&self, message: String) {
+        self.channel.broadcast(
+            serde_json::to_string(&ServerEvent::CloseRoom { message })
+                .expect("server event serialization does not error"),
+        );
+    }
 }
 
 #[derive(Serialize)]

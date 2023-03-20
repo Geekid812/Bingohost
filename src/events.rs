@@ -25,4 +25,7 @@ pub enum ServerEvent {
         #[serde(flatten)]
         line: BingoLine,
     },
+    CloseRoom {
+        message: String,
+    },
 }
