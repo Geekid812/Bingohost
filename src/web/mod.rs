@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use handlebars::Handlebars;
 use once_cell::sync::Lazy;
 use serde::Serialize;
@@ -6,6 +8,7 @@ use warp::{Filter, Rejection};
 
 use crate::config;
 
+mod actions;
 mod helpers;
 mod reject;
 mod roomlist;
@@ -23,7 +26,13 @@ pub async fn main() {
         .and(warp::path::end())
         .map(|| render("roomlist", roomlist::get_template_data()));
 
-    let protected = index.or(roomlist);
+    let delete_room = warp::path!("room" / String / "delete")
+        .map(actions::close_room)
+        .untuple_one()
+        .map(warp::reply)
+        .map(actions::redirect_roomlist);
+
+    let protected = index.or(roomlist).or(delete_room);
     let routes = serve_static.or(authenticate().and(protected));
     warp::serve(routes).run(([127, 0, 0, 1], 8080)).await;
 }
@@ -50,6 +59,7 @@ fn render<T: Serialize>(template: &str, value: T) -> impl warp::Reply {
 
 fn authenticate() -> impl Filter<Extract = (), Error = Rejection> + Copy {
     warp::cookie("key")
+        .or_else(|_| async { Ok::<(String,), Infallible>((String::new(),)) })
         .and_then(|key: String| async move {
             if config::ADMIN_KEY.is_none() || key == config::ADMIN_KEY.unwrap() {
                 Ok(())

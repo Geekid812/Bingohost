@@ -14,3 +14,21 @@ body {
     background: linear-gradient(coral, chocolate);
     min-height: 100%;
 }
+
+.btn,
+.btn:hover {
+    padding: 0 1.5rem;
+    transition: 200ms;
+}
+
+.close-button {
+    background-color: orangered;
+    border-color: orangered;
+}
+
+
+
+.info-button {
+    background-color: cornflowerblue;
+    border-color: cornflowerblue;
+}

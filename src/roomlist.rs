@@ -34,6 +34,10 @@ pub fn find_room(join_code: String) -> Option<OwnedRoom> {
     ROOMS.lock().get(&join_code).map(|arc| arc.clone())
 }
 
+pub fn remove_code(join_code: String) {
+    ROOMS.lock().remove(&join_code);
+}
+
 pub fn remove_room(room: OwnedRoom) {
     let mut lock = ROOMS.lock();
 

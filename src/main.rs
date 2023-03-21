@@ -3,7 +3,7 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 use tokio::net::TcpSocket;
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::FmtSubscriber;
 
 use crate::{client::LoopExit, context::ClientContext};
@@ -55,6 +55,9 @@ async fn main() {
     let auth_arc = Arc::new(authenticator);
     if config::AUTHENTICATION_API_SECRET.is_none() {
         info!("Openplanet authentification is disabled. This is intended to be used only on unofficial servers!");
+    }
+    if config::ADMIN_KEY.is_none() {
+        warn!("Admin key is not set, access to the admin dashboard is unrestricted. This is not recommended!");
     }
 
     // Socket creation

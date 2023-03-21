@@ -5,8 +5,9 @@
     <meta charset="UTF-8">
     <title>Document</title>
     <link rel="stylesheet" href="./static/milligram.min.css">
-    <link rel="stylesheet" href="./static/main.css">
+    <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/fork-awesome@1.2.0/css/fork-awesome.min.css">
     <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Inter:300">
+    <link rel="stylesheet" href="./static/main.css">
 </head>
 
 <body>
@@ -26,6 +27,7 @@
                     <th>Join Code</th>
                     <th>Players</th>
                     <th>Created</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -43,6 +45,18 @@
                     <td>{{this.join_code}}</td>
                     <td>{{this.player_count}}{{#if this.config.size}}/{{this.config.size}}{{/if}}</td>
                     <td>{{strftime this.created "%H:%M"}}</td>
+                    <td>
+                        <a href="#">
+                            <button class="btn info-button">
+                                <i class="fa fa-lg fa-info"></i>
+                            </button>
+                        </a>
+                        <a href="/room/{{this.join_code}}/delete">
+                            <button class="btn close-button">
+                                <i class="fa fa-lg fa-times"></i>
+                            </button>
+                        </a>
+                    </td>
                 </tr>
                 {{/each}}
             </tbody>
