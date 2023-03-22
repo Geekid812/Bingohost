@@ -13,5 +13,13 @@ pub struct Error {
     pub error: String,
 }
 
+impl From<anyhow::Error> for Error {
+    fn from(value: anyhow::Error) -> Self {
+        Self {
+            error: format!("{}", value),
+        }
+    }
+}
+
 #[typetag::serialize]
 impl Response for Error {}

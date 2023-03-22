@@ -40,7 +40,10 @@ where
     }
 }
 
-pub fn init_maps<'a>(room: OwnedRoom, lock: &'a mut MutexGuard<GameRoom>) -> Option<anyhow::Error> {
+pub fn init_maps<'a>(
+    room: &OwnedRoom,
+    lock: &'a mut MutexGuard<GameRoom>,
+) -> Option<anyhow::Error> {
     let config = lock.config();
     let map_count = (config.grid_size * config.grid_size) as usize - lock.maps().len();
     let load_fut = load_maps(map_count, config.selection, config.mappack_id);

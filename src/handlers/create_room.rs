@@ -6,13 +6,14 @@ use crate::{
     config::TEAMS,
     context::{ClientContext, GameContext},
     gamecommon::setup_room,
+    gamemap,
     gameroom::RoomConfiguration,
     gameteam::GameTeam,
     roomlist,
     util::sink::WriteSink,
 };
 
-use super::{Request, Response};
+use super::{generic, Request, Response};
 
 #[derive(Deserialize, Debug)]
 pub struct CreateRoom(RoomConfiguration);
@@ -35,6 +36,11 @@ impl Request for CreateRoom {
         }
         let room_arc = roomlist::create_room(self.0.clone());
         let mut room = room_arc.lock();
+
+        if let Some(err) = gamemap::init_maps(&room_arc, &mut room) {
+            roomlist::remove_room(room_arc.clone());
+            return Box::new(generic::Error::from(err));
+        }
 
         setup_room(&mut room);
         room.add_player(&ctx.identity, true);

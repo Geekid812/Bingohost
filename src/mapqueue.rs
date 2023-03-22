@@ -93,19 +93,21 @@ where
     Fut: Future<Output = Result<GameMap, MapError>>,
 {
     loop {
-        match fetch_callback(&CLIENT).await {
-            Ok(map) => {
-                debug!("enqueued: {}", map.name);
-                queue.lock().push(map);
+        if queue.lock().len() < config::MAP_QUEUE_CAPACITY {
+            match fetch_callback(&CLIENT).await {
+                Ok(map) => {
+                    debug!("enqueued: {}", map.name);
+                    queue.lock().push(map);
+                }
+                Err(e) => match e {
+                    tmxapi::MapError::Rejected(_) => debug!("map rejected from queue"),
+                    tmxapi::MapError::Request(e) => warn!(
+                        "TMX api fetch error: {} {:?}",
+                        e.url().map(Url::to_string).unwrap_or("(None)".to_string()),
+                        e
+                    ),
+                },
             }
-            Err(e) => match e {
-                tmxapi::MapError::Rejected(_) => debug!("map rejected from queue"),
-                tmxapi::MapError::Request(e) => warn!(
-                    "TMX api fetch error: {} {:?}",
-                    e.url().map(Url::to_string).unwrap_or("(None)".to_string()),
-                    e
-                ),
-            },
         }
         tokio::time::sleep(config::FETCH_INTERVAL).await;
     }
