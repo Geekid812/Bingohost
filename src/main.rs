@@ -20,6 +20,7 @@ pub mod gameroom;
 pub mod gameteam;
 pub mod handlers;
 pub mod handshake;
+pub mod mapqueue;
 pub mod reconnect;
 pub mod requests;
 pub mod rest;

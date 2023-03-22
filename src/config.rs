@@ -10,6 +10,7 @@ pub const MINIMUM_CLIENT_VERSION: Version = Version(4, 0);
 pub const MAP_QUEUE_SIZE: usize = 10;
 pub const MAP_QUEUE_CAPACITY: usize = 30;
 pub const TMX_FETCH_TIMEOUT: Duration = Duration::from_secs(20);
+pub const FETCH_INTERVAL: Duration = Duration::from_secs(4);
 
 pub const AUTHENTICATION_API_SECRET: Option<&'static str> = option_env!("AUTH_SECRET");
 pub const TMX_USERAGENT: &'static str = env!("TMX_USERAGENT");

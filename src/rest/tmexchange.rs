@@ -2,12 +2,13 @@ use std::str::FromStr;
 
 use reqwest::{Client, Url};
 use serde::Deserialize;
+use thiserror::Error;
 
 use crate::config;
 use crate::config::routes::tmexchange;
 use crate::gamemap::GameMap;
 
-pub async fn get_randomtmx(client: &Client, count: usize) -> Result<Vec<GameMap>, reqwest::Error> {
+pub async fn get_randomtmx(client: &Client) -> Result<GameMap, MapError> {
     get_maps(
         client,
         Url::from_str(&format!("{}{}", tmexchange::BASE, tmexchange::MAP_SEARCH))
@@ -19,19 +20,17 @@ pub async fn get_randomtmx(client: &Client, count: usize) -> Result<Vec<GameMap>
             ("etags", "23,37,40"),
             ("vehicles", "1"),
         ],
-        count,
         |m| m.author_time <= config::MXRANDOM_MAX_AUTHOR_TIME,
     )
     .await
 }
 
-pub async fn get_totd(client: &Client, count: usize) -> Result<Vec<GameMap>, reqwest::Error> {
+pub async fn get_totd(client: &Client) -> Result<GameMap, MapError> {
     get_maps(
         client,
         Url::from_str(&format!("{}{}", tmexchange::BASE, tmexchange::MAP_SEARCH))
             .expect("map search url to be valid"),
         &[("api", "on"), ("random", "1"), ("mode", "25")],
-        count,
         |_| true,
     )
     .await
@@ -41,30 +40,38 @@ async fn get_maps<F>(
     client: &Client,
     url: Url,
     params: &[(&str, &str)],
-    mut count: usize,
     valid: F,
-) -> Result<Vec<GameMap>, reqwest::Error>
+) -> Result<GameMap, MapError>
 where
     F: Fn(&TMExchangeMap) -> bool,
 {
-    let mut maps = Vec::with_capacity(count);
-    while count > 0 {
-        let map: MapsResult = client
-            .get(url.clone())
-            .query(params)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
-        let tmxmap = map.results[0].clone();
-        if !valid(&tmxmap) {
-            continue;
-        }
-        maps.push(tmxmap.into());
-        count -= 1;
+    let map: MapsResult = client
+        .get(url.clone())
+        .query(params)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    let tmxmap = map.results[0].clone();
+    if !valid(&tmxmap) {
+        return Err(MapError::Rejected(tmxmap));
     }
-    Ok(maps)
+    Ok(tmxmap.into())
+}
+
+#[derive(Error, Debug)]
+pub enum MapError {
+    #[error(transparent)]
+    Request(reqwest::Error),
+    #[error("map is rejected per mapmode criterias")]
+    Rejected(TMExchangeMap),
+}
+
+impl From<reqwest::Error> for MapError {
+    fn from(value: reqwest::Error) -> Self {
+        Self::Request(value)
+    }
 }
 
 pub async fn get_mappack_tracks(
@@ -89,7 +96,7 @@ pub async fn get_mappack_tracks(
     Ok(maps.into_iter().map(|m| m.into()).collect())
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct TMExchangeMap {
     #[serde(rename = "TrackID")]
