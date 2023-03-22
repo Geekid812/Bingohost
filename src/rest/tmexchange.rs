@@ -98,7 +98,7 @@ pub async fn get_mappack_tracks(
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "PascalCase")]
-struct TMExchangeMap {
+pub struct TMExchangeMap {
     #[serde(rename = "TrackID")]
     track_id: i64,
     #[serde(rename = "TrackUID")]

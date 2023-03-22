@@ -1,9 +1,13 @@
+use anyhow::anyhow;
 use futures::Future;
 use once_cell::sync::Lazy;
 use parking_lot::{Mutex, MutexGuard};
-use reqwest::Client;
+use reqwest::{
+    header::{HeaderMap, HeaderValue},
+    Client, ClientBuilder, Url,
+};
 use tokio::join;
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 
 use crate::{
     config,
@@ -16,15 +20,29 @@ static MXRANDOM_MAP_QUEUE: Mutex<Lazy<Vec<GameMap>>> =
     Mutex::new(Lazy::new(|| Vec::with_capacity(config::MAP_QUEUE_CAPACITY)));
 static TOTD_MAP_QUEUE: Mutex<Lazy<Vec<GameMap>>> =
     Mutex::new(Lazy::new(|| Vec::with_capacity(config::MAP_QUEUE_CAPACITY)));
-static CLIENT: Lazy<Client> = Lazy::new(|| Client::new());
+static CLIENT: Lazy<Client> = Lazy::new(load_tmx_client);
+
+fn load_tmx_client() -> Client {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "user-agent",
+        HeaderValue::from_static(config::TMX_USERAGENT),
+    );
+
+    ClientBuilder::new()
+        .timeout(config::TMX_FETCH_TIMEOUT)
+        .default_headers(headers)
+        .build()
+        .expect("tmx client to be built")
+}
 
 fn get_tracks_inner<'a>(
     count: usize,
     mut lock: MutexGuard<'a, Lazy<Vec<GameMap>>>,
-) -> Result<Vec<GameMap>, usize> {
+) -> Result<Vec<GameMap>, anyhow::Error> {
     let length = lock.len();
     if length < count {
-        return Err(length);
+        return Err(anyhow!("could not load enough maps from TrackmaniaExchange, it could be offline or unavailable. Try again in a few minutes."));
     }
     Ok(lock.split_off(length - count))
 }
@@ -33,11 +51,13 @@ fn pushback_tracks_inner<'a>(maps: Vec<GameMap>, mut lock: MutexGuard<'a, Lazy<V
     lock.extend(maps)
 }
 
-pub fn get_tracks(mode: MapMode, count: usize) -> Result<Vec<GameMap>, usize> {
+pub fn get_tracks(mode: MapMode, count: usize) -> Result<Vec<GameMap>, anyhow::Error> {
     match mode {
         MapMode::TOTD => get_tracks_inner(count, TOTD_MAP_QUEUE.lock()),
         MapMode::RandomTMX => get_tracks_inner(count, MXRANDOM_MAP_QUEUE.lock()),
-        MapMode::Mappack => panic!("get_tracks called with Mappack mode"),
+        MapMode::Mappack => Err(anyhow!(
+            "invalid map mode selected. This should not happen!"
+        )),
     }
 }
 
@@ -45,15 +65,26 @@ pub fn pushback_tracks(mode: MapMode, maps: Vec<GameMap>) {
     match mode {
         MapMode::TOTD => pushback_tracks_inner(maps, TOTD_MAP_QUEUE.lock()),
         MapMode::RandomTMX => pushback_tracks_inner(maps, MXRANDOM_MAP_QUEUE.lock()),
-        MapMode::Mappack => panic!("pushback_tracks called with Mappack mode"),
+        MapMode::Mappack => {
+            error!("pushback_tracks called with Mappack mapmode");
+        }
     }
 }
 
 pub async fn get_mappack_tracks(
     mappack_id: u32,
     count: usize,
-) -> Result<Vec<GameMap>, reqwest::Error> {
-    tmxapi::get_mappack_tracks(&CLIENT, mappack_id).await
+) -> Result<Vec<GameMap>, anyhow::Error> {
+    let mut maps = tmxapi::get_mappack_tracks(&CLIENT, mappack_id).await?;
+    if maps.len() < count {
+        return Err(anyhow!(
+            "not enough tracks in the mappack: expected {} tracks, got {}",
+            count,
+            maps.len()
+        ));
+    }
+    maps.truncate(count);
+    Ok(maps)
 }
 
 async fn queue_loop<F, Fut>(queue: &Mutex<Lazy<Vec<GameMap>>>, fetch_callback: F)
@@ -63,13 +94,20 @@ where
 {
     loop {
         match fetch_callback(&CLIENT).await {
-            Ok(map) => queue.lock().push(map),
+            Ok(map) => {
+                debug!("enqueued: {}", map.name);
+                queue.lock().push(map);
+            }
             Err(e) => match e {
                 tmxapi::MapError::Rejected(_) => debug!("map rejected from queue"),
-                tmxapi::MapError::Request(e) => warn!("TMX api fetch error: {:?}", e),
+                tmxapi::MapError::Request(e) => warn!(
+                    "TMX api fetch error: {} {:?}",
+                    e.url().map(Url::to_string).unwrap_or("(None)".to_string()),
+                    e
+                ),
             },
         }
-        tokio::time::sleep(config::FETCH_INTERVAL);
+        tokio::time::sleep(config::FETCH_INTERVAL).await;
     }
 }
 
