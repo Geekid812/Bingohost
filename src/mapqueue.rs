@@ -96,8 +96,11 @@ where
         if queue.lock().len() < config::MAP_QUEUE_CAPACITY {
             match fetch_callback(&CLIENT).await {
                 Ok(map) => {
-                    debug!("enqueued: {}", map.name);
-                    queue.lock().push(map);
+                    let mut lock = queue.lock();
+                    if lock.iter().find(|m| m.uid == map.uid).is_none() {
+                        debug!("enqueued: {}", map.name);
+                        lock.push(map);
+                    }
                 }
                 Err(e) => match e {
                     tmxapi::MapError::Rejected(_) => debug!("map rejected from queue"),
